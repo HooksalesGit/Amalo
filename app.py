@@ -10,7 +10,7 @@ from core.calculators import (
 from core.rules import evaluate_rules, has_blocking
 from core.pdf_export import build_prequal_pdf
 
-st.set_page_config(page_title="Mortgage Income & DTI Dashboard", layout="wide")
+st.set_page_config(page_title="AMALO MORTGAGE INCOME & DTI DASHBOARD", layout="wide")
 
 def init_state():
     ss = st.session_state
@@ -108,7 +108,7 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Failed to load: {e}")
 
-st.title("Mortgage Income & DTI Dashboard")
+st.title("AMALO MORTGAGE INCOME & DTI DASHBOARD")
 st.caption("Florida-friendly defaults • Program-aware calculations • Guardrails & warnings • Exports")
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
