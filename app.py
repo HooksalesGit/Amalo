@@ -102,11 +102,16 @@ FIELD_GUIDANCE = {
 # ---------------------------------------------------------------------------
 
 def text_input_with_help(label: str, key: str, help_key: str, value=""):
-    col1, col2 = st.columns([3, 2])
-    val = col1.text_input(label, value=value, key=key)
-    with col2:
-        st.caption(FIELD_GUIDANCE.get(help_key, ""))
-    return val
+    """Text input with guidance between the title and the entry box."""
+
+    st.markdown(f"**{label}**")
+    st.caption(FIELD_GUIDANCE.get(help_key, ""))
+    return st.text_input(
+        "",
+        value=value,
+        key=key,
+        label_visibility="collapsed",
+    )
 
 
 def number_input_with_help(
@@ -118,55 +123,63 @@ def number_input_with_help(
     min_value=None,
     format=None,
 ):
-    col1, col2 = st.columns([3, 2])
-    val = col1.number_input(
-        label,
+    st.markdown(f"**{label}**")
+    st.caption(FIELD_GUIDANCE.get(help_key, ""))
+    return st.number_input(
+        "",
         value=value,
         step=step,
         min_value=min_value,
         format=format,
         key=key,
+        label_visibility="collapsed",
     )
-    with col2:
-        st.caption(FIELD_GUIDANCE.get(help_key, ""))
-    return val
 
 
 def selectbox_with_help(label: str, options: list, key: str, help_key: str, index=0):
-    col1, col2 = st.columns([3, 2])
-    val = col1.selectbox(label, options=options, index=index, key=key)
-    with col2:
-        st.caption(FIELD_GUIDANCE.get(help_key, ""))
-    return val
+    """Selectbox with guidance rendered below the control."""
+
+    st.markdown(f"**{label}**")
+    st.caption(FIELD_GUIDANCE.get(help_key, ""))
+    return st.selectbox(
+        "",
+        options=options,
+        index=index,
+        key=key,
+        label_visibility="collapsed",
+    )
 
 
 def checkbox_with_help(label: str, key: str, help_key: str):
-    col1, col2 = st.columns([3, 2])
-    val = col1.checkbox(label, key=key)
-    with col2:
-        st.caption(FIELD_GUIDANCE.get(help_key, ""))
-    return val
+    """Checkbox with guidance displayed underneath."""
+
+    st.markdown(f"**{label}**")
+    st.caption(FIELD_GUIDANCE.get(help_key, ""))
+    return st.checkbox(
+        "",
+        key=key,
+        label_visibility="collapsed",
+    )
 
 
 def borrower_select_with_help(label: str, key: str, help_key: str, value: int = 1):
     """Dropdown for selecting borrower by name while storing numeric ID."""
 
-    col1, col2 = st.columns([3, 2])
     ids = list(st.session_state.borrower_names.keys())
     try:
         index = ids.index(int(value))
     except Exception:
         index = 0
-    val = col1.selectbox(
-        label,
+    st.markdown(f"**{label}**")
+    st.caption(FIELD_GUIDANCE.get(help_key, ""))
+    return st.selectbox(
+        "",
         options=ids,
         index=index,
         key=key,
         format_func=lambda x: st.session_state.borrower_names.get(x, f"Borrower {x}"),
+        label_visibility="collapsed",
     )
-    with col2:
-        st.caption(FIELD_GUIDANCE.get(help_key, ""))
-    return val
 
 
 def render_income_tab(key_name, fields, title):
