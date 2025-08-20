@@ -205,8 +205,9 @@ def render_income_tab(key_name, fields, title, show_header: bool = True):
         st.subheader(title)
     rows = st.session_state.get(key_name, [])
     for idx, row in enumerate(rows):
-        exp = st.expander(f"{title} Entry {idx + 1}", expanded=False)
-        with exp:
+        container = st.container()
+        with container:
+            st.markdown(f"**{title} Entry {idx + 1}**")
             if st.button("Remove", key=f"{key_name}_remove_{idx}"):
                 rows.pop(idx)
                 st.session_state[key_name] = rows
@@ -238,6 +239,7 @@ def render_income_tab(key_name, fields, title, show_header: bool = True):
                         val = row.get(fname)
                 row[fname] = val
             rows[idx] = row
+        st.divider()
 
     if st.button(f"Add {title} Entry", key=f"add_{key_name}"):
         blank = {}
