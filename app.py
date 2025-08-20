@@ -566,13 +566,29 @@ with app_tab:
                 "FICO Bucket (display only)",
                 [">=740", "720-739", "700-719", "660-699", "620-659", "<620"],
             )
-            with st.expander("Conventional MI Bands (annual %) by LTV"):
+
+            mi_tab, fha_tab, va_tab, usda_tab = st.tabs(
+                [
+                    "Conventional MI Bands (annual %) by LTV",
+                    "FHA Factors",
+                    "VA Funding Fee Table (%)",
+                    "USDA Guarantee & Annual (%)",
+                ]
+            )
+
+            with mi_tab:
                 df = pd.DataFrame(
-                    [{"Band": k, "AnnualPct": v} for k, v in st.session_state.program_tables["conventional_mi"].items()]
+                    [
+                        {"Band": k, "AnnualPct": v}
+                        for k, v in st.session_state.program_tables["conventional_mi"].items()
+                    ]
                 )
                 df = st.data_editor(df, use_container_width=True)
-                st.session_state.program_tables["conventional_mi"] = dict(zip(df["Band"], df["AnnualPct"]))
-            with st.expander("FHA Factors"):
+                st.session_state.program_tables["conventional_mi"] = dict(
+                    zip(df["Band"], df["AnnualPct"])
+                )
+
+            with fha_tab:
                 cols = st.columns(2)
                 st.session_state.program_tables["fha"]["ufmip_pct"] = cols[0].number_input(
                     "Upfront MIP (%)",
@@ -585,15 +601,19 @@ with app_tab:
                 st.session_state.program_tables["fha"]["annual_table"] = {
                     r["Key"]: r["AnnualPct"] for _, r in df.iterrows()
                 }
-            with st.expander("VA Funding Fee Table (%)"):
+
+            with va_tab:
                 st.session_state.first_use_va = st.checkbox(
                     "First Use", value=bool(st.session_state.first_use_va)
                 )
                 va = st.session_state.program_tables["va"]
                 df = pd.DataFrame([{"Key": k, "Pct": v} for k, v in va.items()])
                 df = st.data_editor(df, use_container_width=True)
-                st.session_state.program_tables["va"] = {r["Key"]: r["Pct"] for _, r in df.iterrows()}
-            with st.expander("USDA Guarantee & Annual (%)"):
+                st.session_state.program_tables["va"] = {
+                    r["Key"]: r["Pct"] for _, r in df.iterrows()
+                }
+
+            with usda_tab:
                 usda = st.session_state.program_tables["usda"]
                 c = st.columns(2)
                 usda["guarantee_pct"] = c[0].number_input(
