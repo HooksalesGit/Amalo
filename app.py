@@ -148,6 +148,27 @@ def checkbox_with_help(label: str, key: str, help_key: str):
     return val
 
 
+def borrower_select_with_help(label: str, key: str, help_key: str, value: int = 1):
+    """Dropdown for selecting borrower by name while storing numeric ID."""
+
+    col1, col2 = st.columns([3, 2])
+    ids = list(st.session_state.borrower_names.keys())
+    try:
+        index = ids.index(int(value))
+    except Exception:
+        index = 0
+    val = col1.selectbox(
+        label,
+        options=ids,
+        index=index,
+        key=key,
+        format_func=lambda x: st.session_state.borrower_names.get(x, f"Borrower {x}"),
+    )
+    with col2:
+        st.caption(FIELD_GUIDANCE.get(help_key, ""))
+    return val
+
+
 def render_income_tab(key_name, fields, title):
     """Render a dynamic list of entries for a given income/debt type.
 
@@ -164,25 +185,31 @@ def render_income_tab(key_name, fields, title):
                 rows.pop(idx)
                 st.session_state[key_name] = rows
                 st.experimental_rerun()
-            for fname, ftype, options in fields:
+            cols = st.columns(3)
+            for f_idx, (fname, ftype, options) in enumerate(fields):
                 fkey = f"{key_name}_{idx}_{fname}"
-                if ftype == "text":
-                    val = text_input_with_help(fname, fkey, fname, value=row.get(fname, ""))
-                elif ftype == "number":
-                    val = number_input_with_help(
-                        fname, fkey, fname, value=float(row.get(fname, 0) or 0), step=1.0
-                    )
-                elif ftype == "select":
-                    current = row.get(fname, options[0] if options else "")
-                    try:
-                        index = options.index(current)
-                    except Exception:
-                        index = 0
-                    val = selectbox_with_help(fname, options, fkey, fname, index=index)
-                elif ftype == "checkbox":
-                    val = checkbox_with_help(fname, fkey, fname)
-                else:
-                    val = row.get(fname)
+                target = cols[f_idx % 3]
+                with target:
+                    if ftype == "text":
+                        val = text_input_with_help(fname, fkey, fname, value=row.get(fname, ""))
+                    elif ftype == "number":
+                        val = number_input_with_help(
+                            fname, fkey, fname, value=float(row.get(fname, 0) or 0), step=1.0
+                        )
+                    elif ftype == "select":
+                        current = row.get(fname, options[0] if options else "")
+                        try:
+                            index = options.index(current)
+                        except Exception:
+                            index = 0
+                        val = selectbox_with_help(fname, options, fkey, fname, index=index)
+                    elif ftype == "checkbox":
+                        val = checkbox_with_help(fname, fkey, fname)
+                    elif ftype == "borrower":
+                        current = int(row.get(fname, 1) or 1)
+                        val = borrower_select_with_help("Borrower", fkey, "BorrowerID", value=current)
+                    else:
+                        val = row.get(fname)
                 row[fname] = val
             rows[idx] = row
 
@@ -197,6 +224,8 @@ def render_income_tab(key_name, fields, title):
                 blank[fname] = opts[0] if opts else ""
             elif ftype == "checkbox":
                 blank[fname] = False
+            elif ftype == "borrower":
+                blank[fname] = 1
         rows.append(blank)
         st.session_state[key_name] = rows
         st.experimental_rerun()
@@ -328,7 +357,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs(
 
 with tab1:
     w2_fields = [
-        ("BorrowerID", "number", None),
+        ("BorrowerID", "borrower", None),
         ("Employer", "text", None),
         ("PayType", "select", ["Salary", "Hourly"]),
         ("AnnualSalary", "number", None),
@@ -348,7 +377,7 @@ with tab1:
 
 with tab2:
     schc_fields = [
-        ("BorrowerID", "number", None),
+        ("BorrowerID", "borrower", None),
         ("BusinessName", "text", None),
         ("Year", "number", None),
         ("NetProfit", "number", None),
@@ -374,7 +403,7 @@ with tab3:
         value=bool(st.session_state.k1_analyzed_liquidity),
     )
     k1_fields = [
-        ("BorrowerID", "number", None),
+        ("BorrowerID", "borrower", None),
         ("EntityName", "text", None),
         ("Year", "number", None),
         ("Type", "select", ["1065", "1120S"]),
@@ -397,7 +426,7 @@ with tab4:
         "Only include entities where the borrower owns 100%. Entries with <100% ownership are ignored."
     )
     c1120_fields = [
-        ("BorrowerID", "number", None),
+        ("BorrowerID", "borrower", None),
         ("CorpName", "text", None),
         ("Year", "number", None),
         ("OwnershipPct", "number", None),
@@ -428,7 +457,7 @@ with tab5:
         step=50.0,
     )
     rental_fields = [
-        ("BorrowerID", "number", None),
+        ("BorrowerID", "borrower", None),
         ("Property", "text", None),
         ("Year", "number", None),
         ("Rents", "number", None),
@@ -440,7 +469,7 @@ with tab5:
 with tab6:
     st.subheader("Other Qualifying Income")
     other_fields = [
-        ("BorrowerID", "number", None),
+        ("BorrowerID", "borrower", None),
         ("Type", "text", None),
         ("GrossMonthly", "number", None),
         ("GrossUpPct", "number", None),
