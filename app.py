@@ -102,10 +102,10 @@ FIELD_GUIDANCE = {
 # ---------------------------------------------------------------------------
 
 def text_input_with_help(label: str, key: str, help_key: str, value=""):
-    col1, col2 = st.columns([3, 2])
-    val = col1.text_input(label, value=value, key=key)
-    with col2:
-        st.caption(FIELD_GUIDANCE.get(help_key, ""))
+    """Text input that shows guidance directly beneath the field title."""
+
+    val = st.text_input(label, value=value, key=key)
+    st.caption(FIELD_GUIDANCE.get(help_key, ""))
     return val
 
 
@@ -118,8 +118,7 @@ def number_input_with_help(
     min_value=None,
     format=None,
 ):
-    col1, col2 = st.columns([3, 2])
-    val = col1.number_input(
+    val = st.number_input(
         label,
         value=value,
         step=step,
@@ -127,45 +126,42 @@ def number_input_with_help(
         format=format,
         key=key,
     )
-    with col2:
-        st.caption(FIELD_GUIDANCE.get(help_key, ""))
+    st.caption(FIELD_GUIDANCE.get(help_key, ""))
     return val
 
 
 def selectbox_with_help(label: str, options: list, key: str, help_key: str, index=0):
-    col1, col2 = st.columns([3, 2])
-    val = col1.selectbox(label, options=options, index=index, key=key)
-    with col2:
-        st.caption(FIELD_GUIDANCE.get(help_key, ""))
+    """Selectbox with guidance rendered below the control."""
+
+    val = st.selectbox(label, options=options, index=index, key=key)
+    st.caption(FIELD_GUIDANCE.get(help_key, ""))
     return val
 
 
 def checkbox_with_help(label: str, key: str, help_key: str):
-    col1, col2 = st.columns([3, 2])
-    val = col1.checkbox(label, key=key)
-    with col2:
-        st.caption(FIELD_GUIDANCE.get(help_key, ""))
+    """Checkbox with guidance displayed underneath."""
+
+    val = st.checkbox(label, key=key)
+    st.caption(FIELD_GUIDANCE.get(help_key, ""))
     return val
 
 
 def borrower_select_with_help(label: str, key: str, help_key: str, value: int = 1):
     """Dropdown for selecting borrower by name while storing numeric ID."""
 
-    col1, col2 = st.columns([3, 2])
     ids = list(st.session_state.borrower_names.keys())
     try:
         index = ids.index(int(value))
     except Exception:
         index = 0
-    val = col1.selectbox(
+    val = st.selectbox(
         label,
         options=ids,
         index=index,
         key=key,
         format_func=lambda x: st.session_state.borrower_names.get(x, f"Borrower {x}"),
     )
-    with col2:
-        st.caption(FIELD_GUIDANCE.get(help_key, ""))
+    st.caption(FIELD_GUIDANCE.get(help_key, ""))
     return val
 
 
