@@ -102,11 +102,13 @@ FIELD_GUIDANCE = {
 # ---------------------------------------------------------------------------
 
 def text_input_with_help(label: str, key: str, help_key: str, value=""):
-    """Text input that shows guidance directly beneath the field title."""
+    """Text input with guidance rendered between the title and control."""
 
-    val = st.text_input(label, value=value, key=key)
-    st.caption(FIELD_GUIDANCE.get(help_key, ""))
-    return val
+    st.markdown(f"**{label}**")
+    help = FIELD_GUIDANCE.get(help_key, "")
+    if help:
+        st.caption(help)
+    return st.text_input("", value=value, key=key, label_visibility="collapsed")
 
 
 def number_input_with_help(
@@ -118,32 +120,45 @@ def number_input_with_help(
     min_value=None,
     format=None,
 ):
-    val = st.number_input(
-        label,
+    st.markdown(f"**{label}**")
+    help = FIELD_GUIDANCE.get(help_key, "")
+    if help:
+        st.caption(help)
+    return st.number_input(
+        "",
         value=value,
         step=step,
         min_value=min_value,
         format=format,
         key=key,
+        label_visibility="collapsed",
     )
-    st.caption(FIELD_GUIDANCE.get(help_key, ""))
-    return val
 
 
 def selectbox_with_help(label: str, options: list, key: str, help_key: str, index=0):
-    """Selectbox with guidance rendered below the control."""
+    """Selectbox with guidance rendered between the title and control."""
 
-    val = st.selectbox(label, options=options, index=index, key=key)
-    st.caption(FIELD_GUIDANCE.get(help_key, ""))
-    return val
+    st.markdown(f"**{label}**")
+    help = FIELD_GUIDANCE.get(help_key, "")
+    if help:
+        st.caption(help)
+    return st.selectbox(
+        "",
+        options=options,
+        index=index,
+        key=key,
+        label_visibility="collapsed",
+    )
 
 
 def checkbox_with_help(label: str, key: str, help_key: str):
-    """Checkbox with guidance displayed underneath."""
+    """Checkbox with guidance displayed between the title and control."""
 
-    val = st.checkbox(label, key=key)
-    st.caption(FIELD_GUIDANCE.get(help_key, ""))
-    return val
+    st.markdown(f"**{label}**")
+    help = FIELD_GUIDANCE.get(help_key, "")
+    if help:
+        st.caption(help)
+    return st.checkbox("", key=key, label_visibility="collapsed")
 
 
 def borrower_select_with_help(label: str, key: str, help_key: str, value: int = 1):
@@ -154,15 +169,18 @@ def borrower_select_with_help(label: str, key: str, help_key: str, value: int = 
         index = ids.index(int(value))
     except Exception:
         index = 0
-    val = st.selectbox(
-        label,
+    st.markdown(f"**{label}**")
+    help = FIELD_GUIDANCE.get(help_key, "")
+    if help:
+        st.caption(help)
+    return st.selectbox(
+        "",
         options=ids,
         index=index,
         key=key,
         format_func=lambda x: st.session_state.borrower_names.get(x, f"Borrower {x}"),
+        label_visibility="collapsed",
     )
-    st.caption(FIELD_GUIDANCE.get(help_key, ""))
-    return val
 
 
 def render_income_tab(key_name, fields, title):
