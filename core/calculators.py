@@ -57,11 +57,14 @@ def sch_c_totals(df: pd.DataFrame)->pd.DataFrame:
         nz_series(out.get('Depreciation'))-nz_series(out.get('NonDedMeals'))+nz_series(out.get('UseOfHome'))+
         nz_series(out.get('AmortCasualty'))+nz_series(out.get('MileageDep')))
     by_year=out.groupby(['BorrowerID','Year'],dropna=False)['AdjustedAnnual'].sum().reset_index()
-    def decline_flag(sub):
-        if sub.shape[0]<2: return False
-        sub=sub.sort_values('Year'); vals=sub['AdjustedAnnual'].values
-        return vals[-1] < 0.8*vals[-2]
-    flags=by_year.groupby('BorrowerID').apply(decline_flag).reset_index(name='SchC_DecliningFlag')
+    by_year['AdjustedAnnual']=pd.to_numeric(by_year['AdjustedAnnual'], errors='coerce').fillna(0.0)
+    by_year=by_year.sort_values(['BorrowerID','Year'])
+    def decline_flag(s: pd.Series) -> bool:
+        if len(s) < 2:
+            return False
+        return bool(s.iloc[-1] < 0.8 * s.iloc[-2])
+    flags=by_year.groupby('BorrowerID')['AdjustedAnnual'].apply(decline_flag).reset_index()
+    flags.rename(columns={'AdjustedAnnual':'SchC_DecliningFlag'}, inplace=True)
     avg=by_year.groupby('BorrowerID',dropna=False)['AdjustedAnnual'].mean().reset_index()
     avg['SchC_Monthly']=avg['AdjustedAnnual']/12
     return avg.merge(flags,on='BorrowerID',how='left')[['BorrowerID','SchC_Monthly','SchC_DecliningFlag']]
