@@ -353,12 +353,83 @@ with st.sidebar:
 
 st.title("AMALO MORTGAGE INCOME & DTI DASHBOARD")
 st.caption("Florida-friendly defaults • Program-aware calculations • Guardrails & warnings • Exports")
+INCOME_FORMS = {
+    "W‑2": {
+        "key": "w2_rows",
+        "title": "W‑2 / Base Employment",
+        "guidelines": (
+            "Use for salaried or hourly employees based on W‑2s or pay stubs. "
+            "Include base pay and variable income when stable."
+        ),
+        "fields": [
+            ("BorrowerID", "borrower", None),
+            ("Employer", "text", None),
+            ("PayType", "select", ["Salary", "Hourly"]),
+            ("AnnualSalary", "number", None),
+            ("HourlyRate", "number", None),
+            ("HoursPerWeek", "number", None),
+            ("OT_YTD", "number", None),
+            ("Bonus_YTD", "number", None),
+            ("Comm_YTD", "number", None),
+            ("Months_YTD", "number", None),
+            ("OT_LY", "number", None),
+            ("Bonus_LY", "number", None),
+            ("Comm_LY", "number", None),
+            ("Months_LY", "number", None),
+            ("IncludeVariable", "checkbox", None),
+        ],
+    },
+    "Sch C": {
+        "key": "schc_rows",
+        "title": "Self‑Employed — Schedule C (two‑year analysis)",
+        "guidelines": (
+            "Use for sole proprietorships reporting on Schedule C. "
+            "Provide two years of history and adjust for allowable add‑backs."
+        ),
+        "fields": [
+            ("BorrowerID", "borrower", None),
+            ("BusinessName", "text", None),
+            ("Year", "number", None),
+            ("NetProfit", "number", None),
+            ("Nonrecurring", "number", None),
+            ("Depletion", "number", None),
+            ("Depreciation", "number", None),
+            ("NonDedMeals", "number", None),
+            ("UseOfHome", "number", None),
+            ("AmortCasualty", "number", None),
+            ("BusinessMiles", "number", None),
+            ("MileDepRate", "number", None),
+        ],
+    },
+    "K‑1": {
+        "key": "k1_rows",
+        "title": "K‑1 Income",
+        "guidelines": (
+            "Use for partnership or S‑Corporation K‑1 earnings. "
+            "Verify distribution history or analyze business liquidity."
+        ),
+        "fields": [
+            ("BorrowerID", "borrower", None),
+            ("EntityName", "text", None),
+            ("Year", "number", None),
+            ("Type", "select", ["1065", "1120S"]),
+            ("OwnershipPct", "number", None),
+            ("Ordinary", "number", None),
+            ("NetRentalOther", "number", None),
+            ("GuaranteedPmt", "number", None),
+            ("Nonrecurring", "number", None),
+            ("Depreciation", "number", None),
+            ("Depletion", "number", None),
+            ("AmortCasualty", "number", None),
+            ("NotesLT1yr", "number", None),
+            ("NonDed_TandE", "number", None),
+        ],
+    },
+}
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs(
+income_tab, ccorp_tab, rental_tab, other_tab, housing_tab, debt_tab, dashboard_tab, max_tab = st.tabs(
     [
-        "W‑2 / Base",
-        "Sch C (1040)",
-        "K‑1 (1065/1120S)",
+        "Income",
         "1120 C‑Corp",
         "Rentals (Sch E)",
         "Other Income",
@@ -369,72 +440,23 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs(
     ]
 )
 
-with tab1:
-    w2_fields = [
-        ("BorrowerID", "borrower", None),
-        ("Employer", "text", None),
-        ("PayType", "select", ["Salary", "Hourly"]),
-        ("AnnualSalary", "number", None),
-        ("HourlyRate", "number", None),
-        ("HoursPerWeek", "number", None),
-        ("OT_YTD", "number", None),
-        ("Bonus_YTD", "number", None),
-        ("Comm_YTD", "number", None),
-        ("Months_YTD", "number", None),
-        ("OT_LY", "number", None),
-        ("Bonus_LY", "number", None),
-        ("Comm_LY", "number", None),
-        ("Months_LY", "number", None),
-        ("IncludeVariable", "checkbox", None),
-    ]
-    render_income_tab("w2_rows", w2_fields, "W‑2 / Base Employment")
+with income_tab:
+    st.subheader("Income Calculators")
+    income_type = st.selectbox("Income Type", list(INCOME_FORMS.keys()))
+    info = INCOME_FORMS[income_type]
+    st.info(info["guidelines"])
+    if income_type == "K‑1":
+        c1, c2 = st.columns(2)
+        st.session_state.k1_verified_distributions = c1.checkbox(
+            "Verified distributions history", value=bool(st.session_state.k1_verified_distributions)
+        )
+        st.session_state.k1_analyzed_liquidity = c2.checkbox(
+            "Analyzed business liquidity (if no distributions)",
+            value=bool(st.session_state.k1_analyzed_liquidity),
+        )
+    render_income_tab(info["key"], info["fields"], info["title"])
 
-with tab2:
-    schc_fields = [
-        ("BorrowerID", "borrower", None),
-        ("BusinessName", "text", None),
-        ("Year", "number", None),
-        ("NetProfit", "number", None),
-        ("Nonrecurring", "number", None),
-        ("Depletion", "number", None),
-        ("Depreciation", "number", None),
-        ("NonDedMeals", "number", None),
-        ("UseOfHome", "number", None),
-        ("AmortCasualty", "number", None),
-        ("BusinessMiles", "number", None),
-        ("MileDepRate", "number", None),
-    ]
-    render_income_tab("schc_rows", schc_fields, "Self‑Employed — Schedule C (two‑year analysis)")
-
-with tab3:
-    st.subheader("Partnerships & S Corps — K‑1")
-    c1, c2 = st.columns(2)
-    st.session_state.k1_verified_distributions = c1.checkbox(
-        "Verified distributions history", value=bool(st.session_state.k1_verified_distributions)
-    )
-    st.session_state.k1_analyzed_liquidity = c2.checkbox(
-        "Analyzed business liquidity (if no distributions)",
-        value=bool(st.session_state.k1_analyzed_liquidity),
-    )
-    k1_fields = [
-        ("BorrowerID", "borrower", None),
-        ("EntityName", "text", None),
-        ("Year", "number", None),
-        ("Type", "select", ["1065", "1120S"]),
-        ("OwnershipPct", "number", None),
-        ("Ordinary", "number", None),
-        ("NetRentalOther", "number", None),
-        ("GuaranteedPmt", "number", None),
-        ("Nonrecurring", "number", None),
-        ("Depreciation", "number", None),
-        ("Depletion", "number", None),
-        ("AmortCasualty", "number", None),
-        ("NotesLT1yr", "number", None),
-        ("NonDed_TandE", "number", None),
-    ]
-    render_income_tab("k1_rows", k1_fields, "K‑1 Income")
-
-with tab4:
+with ccorp_tab:
     st.subheader("Regular Corporation — 1120 (100% owner only)")
     st.warning(
         "Only include entities where the borrower owns 100%. Entries with <100% ownership are ignored."
@@ -457,7 +479,7 @@ with tab4:
     ]
     render_income_tab("c1120_rows", c1120_fields, "C‑Corporation (1120)")
 
-with tab5:
+with rental_tab:
     st.subheader("Rental Income — Policy")
     st.session_state.rental_method = st.radio(
         "Method",
@@ -480,7 +502,7 @@ with tab5:
     ]
     render_income_tab("rental_rows", rental_fields, "Rental Property")
 
-with tab6:
+with other_tab:
     st.subheader("Other Qualifying Income")
     other_fields = [
         ("BorrowerID", "borrower", None),
@@ -494,7 +516,7 @@ with tab6:
         value=bool(st.session_state.support_continuance_ok),
     )
 
-with tab7:
+with housing_tab:
     st.subheader("Payment & Proposed Housing (Program‑Aware)")
     H = st.session_state.housing
     c1, c2, c3 = st.columns(3)
@@ -556,7 +578,7 @@ with tab7:
         f"**Proposed Housing (PITI + HOA + MI): ${fees['total']:,.2f}**"
     )
 
-with tab8:
+with debt_tab:
     st.subheader("Other Recurring Debts")
     debt_fields = [
         ("DebtName", "text", None),
@@ -564,7 +586,7 @@ with tab8:
     ]
     render_income_tab("debt_rows", debt_fields, "Debt")
 
-with tab9:
+with dashboard_tab:
     st.subheader("DTI, Warnings & Checklist")
     # convert row data to DataFrames expected by calculators
     w2_df = pd.DataFrame(st.session_state.w2_rows)
@@ -770,7 +792,7 @@ with tab9:
     else:
         c3.info("Resolve critical warnings or add an override reason to enable PDF export.")
 
-with tab10:
+with max_tab:
     st.subheader("Max Purchase / Max Loan Solver")
     try:
         incomes = combine_income(
