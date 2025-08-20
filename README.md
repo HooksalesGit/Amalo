@@ -7,6 +7,20 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+## Interface Layout
+
+The application opens with a top bar containing program selection and target
+DTI inputs. Below the bar, the workspace is divided into three columns:
+
+1. **Income** – borrowers, employment, self‑employment, rental, and other
+   income calculators.
+2. **Debts** – entry of recurring liabilities.
+3. **Property** – purchase details, program fees, and save/load options.
+
+A separate **Summary** tab consolidates housing expense, debt‑to‑income ratios,
+warnings, documentation checklist, and a solver for maximum qualifying loan or
+purchase price.
+
 ## Calculator Overview
 
 The `core.calculators` module contains helpers for analyzing common mortgage
