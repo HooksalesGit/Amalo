@@ -2,13 +2,204 @@
 import json, io
 import streamlit as st
 import pandas as pd
-from core.presets import PROGRAM_PRESETS, CONV_MI_BANDS, FHA_TABLES, VA_TABLE, USDA_TABLE, DISCLAIMER, FL_DEFAULTS
+from core.presets import (
+    PROGRAM_PRESETS,
+    CONV_MI_BANDS,
+    FHA_TABLES,
+    VA_TABLE,
+    USDA_TABLE,
+    DISCLAIMER,
+    FL_DEFAULTS,
+)
 from core.calculators import (
-    w2_totals, sch_c_totals, k1_totals, ccorp_totals, rentals_policy, other_income_totals,
-    combine_income, piti_components, dti, max_affordable_pi, monthly_payment, principal_from_payment, nz
+    w2_totals,
+    sch_c_totals,
+    k1_totals,
+    ccorp_totals,
+    rentals_policy,
+    other_income_totals,
+    combine_income,
+    piti_components,
+    dti,
+    max_affordable_pi,
+    monthly_payment,
+    principal_from_payment,
+    nz,
 )
 from core.rules import evaluate_rules, has_blocking
 from core.pdf_export import build_prequal_pdf
+
+
+# ---------------------------------------------------------------------------
+# Field guidance strings for dynamic forms. Each key corresponds to a field
+# used in the income / debt entry forms and is displayed alongside the input
+# control.  These mirror the guidance provided in the original Streamlit
+# example and help originators locate values on borrower documents.
+# ---------------------------------------------------------------------------
+
+FIELD_GUIDANCE = {
+    "BorrowerID": "Enter borrower number (1 for primary, 2 for co‑borrower).",
+    "Employer": "Employer name from pay stubs or W‑2.",
+    "PayType": "Salary or Hourly. Determines which base pay fields are used.",
+    "AnnualSalary": "W‑2 Box 1 amount.",
+    "HourlyRate": "Hourly wage from pay stub.",
+    "HoursPerWeek": "Average hours worked per week.",
+    "OT_YTD": "Year‑to‑date overtime earnings.",
+    "Bonus_YTD": "Year‑to‑date bonus earnings.",
+    "Comm_YTD": "Year‑to‑date commission earnings.",
+    "Months_YTD": "Months of variable income received this year.",
+    "OT_LY": "Prior year overtime earnings.",
+    "Bonus_LY": "Prior year bonus earnings.",
+    "Comm_LY": "Prior year commission earnings.",
+    "Months_LY": "Months of variable income received last year.",
+    "IncludeVariable": "Include variable income if stable.",
+    "BusinessName": "Schedule C business name.",
+    "Year": "Tax year for entry.",
+    "NetProfit": "Schedule C Line 31.",
+    "Nonrecurring": "Nonrecurring income/loss to add back.",
+    "Depletion": "Schedule C Line 12.",
+    "Depreciation": "Schedule C Line 13.",
+    "NonDedMeals": "Schedule C Line 24b – subtract.",
+    "UseOfHome": "Schedule C Line 30 – add back.",
+    "AmortCasualty": "Other amortization/casualty losses – add back.",
+    "BusinessMiles": "Business miles driven.",
+    "MileDepRate": "Depreciation portion of IRS mileage rate.",
+    "EntityName": "Partnership or S‑Corp name.",
+    "Type": "1065 or 1120S entity type.",
+    "OwnershipPct": "Borrower ownership percentage.",
+    "Ordinary": "K‑1 Box 1 ordinary income.",
+    "NetRentalOther": "K‑1 Box 2–3 income.",
+    "GuaranteedPmt": "K‑1 Box 4c guaranteed payments (partnership only).",
+    "NotesLT1yr": "Notes payable <1yr – subtract.",
+    "NonDed_TandE": "Non‑deductible T&E – subtract.",
+    "CorpName": "C‑Corporation name.",
+    "TaxableIncome": "1120 Line 30 taxable income.",
+    "TotalTax": "1120 Line 31 total tax.",
+    "OtherIncLoss": "Other income/loss add‑backs.",
+    "DividendsPaid": "Dividends paid to shareholders – subtract.",
+    "Property": "Rental property identifier.",
+    "Rents": "Schedule E rents received.",
+    "Expenses": "Schedule E total expenses.",
+    "Type_other": "Type of other income (SS, alimony, etc).",
+    "GrossMonthly": "Gross monthly amount received.",
+    "GrossUpPct": "Percent to gross up if non‑taxable.",
+    "DebtName": "Description of debt (Car loan, etc).",
+    "MonthlyPayment": "Monthly payment amount.",
+    "PurchasePrice": "Subject property price.",
+    "DownPaymentAmt": "Down payment amount.",
+    "RatePct": "Interest rate (annual %).",
+    "TermYears": "Mortgage term in years.",
+    "TaxRatePct": "Annual property tax rate % of price.",
+    "HOI_Annual": "Annual homeowners insurance premium.",
+    "HOA_Monthly": "Monthly HOA/condo dues.",
+}
+
+
+# ---------------------------------------------------------------------------
+# Helper widgets that display guidance text next to each input.  These closely
+# mirror the layout from the example repository and provide more intuitive
+# calculators for end users.
+# ---------------------------------------------------------------------------
+
+def text_input_with_help(label: str, key: str, help_key: str, value=""):
+    col1, col2 = st.columns([3, 2])
+    val = col1.text_input(label, value=value, key=key)
+    with col2:
+        st.caption(FIELD_GUIDANCE.get(help_key, ""))
+    return val
+
+
+def number_input_with_help(
+    label: str,
+    key: str,
+    help_key: str,
+    value=0.0,
+    step=1.0,
+    min_value=None,
+    format=None,
+):
+    col1, col2 = st.columns([3, 2])
+    val = col1.number_input(
+        label,
+        value=value,
+        step=step,
+        min_value=min_value,
+        format=format,
+        key=key,
+    )
+    with col2:
+        st.caption(FIELD_GUIDANCE.get(help_key, ""))
+    return val
+
+
+def selectbox_with_help(label: str, options: list, key: str, help_key: str, index=0):
+    col1, col2 = st.columns([3, 2])
+    val = col1.selectbox(label, options=options, index=index, key=key)
+    with col2:
+        st.caption(FIELD_GUIDANCE.get(help_key, ""))
+    return val
+
+
+def checkbox_with_help(label: str, key: str, help_key: str):
+    col1, col2 = st.columns([3, 2])
+    val = col1.checkbox(label, key=key)
+    with col2:
+        st.caption(FIELD_GUIDANCE.get(help_key, ""))
+    return val
+
+
+def render_income_tab(key_name, fields, title):
+    """Render a dynamic list of entries for a given income/debt type.
+
+    Each entry is displayed inside an expander.  Users can add or remove rows
+    and each input displays guidance text describing its source.
+    """
+
+    st.subheader(title)
+    rows = st.session_state.get(key_name, [])
+    for idx, row in enumerate(rows):
+        exp = st.expander(f"{title} Entry {idx + 1}", expanded=False)
+        with exp:
+            if st.button("Remove", key=f"{key_name}_remove_{idx}"):
+                rows.pop(idx)
+                st.session_state[key_name] = rows
+                st.experimental_rerun()
+            for fname, ftype, options in fields:
+                fkey = f"{key_name}_{idx}_{fname}"
+                if ftype == "text":
+                    val = text_input_with_help(fname, fkey, fname, value=row.get(fname, ""))
+                elif ftype == "number":
+                    val = number_input_with_help(
+                        fname, fkey, fname, value=float(row.get(fname, 0) or 0), step=1.0
+                    )
+                elif ftype == "select":
+                    current = row.get(fname, options[0] if options else "")
+                    try:
+                        index = options.index(current)
+                    except Exception:
+                        index = 0
+                    val = selectbox_with_help(fname, options, fkey, fname, index=index)
+                elif ftype == "checkbox":
+                    val = checkbox_with_help(fname, fkey, fname)
+                else:
+                    val = row.get(fname)
+                row[fname] = val
+            rows[idx] = row
+
+    if st.button(f"Add {title} Entry", key=f"add_{key_name}"):
+        blank = {}
+        for fname, ftype, opts in fields:
+            if ftype == "number":
+                blank[fname] = 0.0
+            elif ftype == "text":
+                blank[fname] = ""
+            elif ftype == "select":
+                blank[fname] = opts[0] if opts else ""
+            elif ftype == "checkbox":
+                blank[fname] = False
+        rows.append(blank)
+        st.session_state[key_name] = rows
+        st.experimental_rerun()
 
 st.set_page_config(page_title="AMALO MORTGAGE INCOME & DTI DASHBOARD", layout="wide")
 
@@ -18,12 +209,15 @@ def init_state():
     ss.setdefault("program", "Conventional")
     ss.setdefault("targets", PROGRAM_PRESETS["Conventional"].copy())
     ss.setdefault("fico_bucket", ">=740")
-    ss.setdefault("program_tables", {
-        "conventional_mi": CONV_MI_BANDS.copy(),
-        "fha": FHA_TABLES.copy(),
-        "va": VA_TABLE.copy(),
-        "usda": USDA_TABLE.copy()
-    })
+    ss.setdefault(
+        "program_tables",
+        {
+            "conventional_mi": CONV_MI_BANDS.copy(),
+            "fha": FHA_TABLES.copy(),
+            "va": VA_TABLE.copy(),
+            "usda": USDA_TABLE.copy(),
+        },
+    )
     ss.setdefault("finance_upfront", True)
     ss.setdefault("first_use_va", True)
     ss.setdefault("rental_method", "ScheduleE")
@@ -31,21 +225,27 @@ def init_state():
     ss.setdefault("k1_verified_distributions", False)
     ss.setdefault("k1_analyzed_liquidity", False)
     ss.setdefault("support_continuance_ok", False)
-    ss.setdefault("borrower_names", {1:"Borrower 1", 2:"Borrower 2"})
-    def mkdf(cols): return pd.DataFrame(columns=cols)
-    ss.setdefault("w2", mkdf(['BorrowerID','Employer','PayType','AnnualSalary','HourlyRate','HoursPerWeek','OT_YTD','Bonus_YTD','Comm_YTD','Months_YTD','OT_LY','Bonus_LY','Comm_LY','Months_LY','IncludeVariable']))
-    ss.setdefault("schc", mkdf(['BorrowerID','BusinessName','Year','NetProfit','Nonrecurring','Depletion','Depreciation','NonDedMeals','UseOfHome','AmortCasualty','BusinessMiles','MileDepRate']))
-    ss.setdefault("k1", mkdf(['BorrowerID','EntityName','Type','Year','OwnershipPct','Ordinary','NetRentalOther','GuaranteedPmt','Nonrecurring','Depreciation','Depletion','AmortCasualty','NotesLT1yr','NonDed_TandE']))
-    ss.setdefault("c1120", mkdf(['BorrowerID','CorpName','Year','OwnershipPct','TaxableIncome','TotalTax','Nonrecurring','OtherIncLoss','Depreciation','Depletion','AmortCasualty','NotesLT1yr','NonDed_TandE','DividendsPaid']))
-    ss.setdefault("rentals", mkdf(['BorrowerID','Property','Year','Rents','Expenses','Depreciation']))
-    ss.setdefault("other", mkdf(['BorrowerID','Type','GrossMonthly','GrossUpPct']))
-    ss.setdefault("debts", mkdf(['DebtName','MonthlyPayment']))
-    ss.setdefault("housing", {
-        "purchase_price": 500000.0, "down_payment_amt": 100000.0,
-        "rate_pct": 6.75, "term_years": 30,
-        "tax_rate_pct": FL_DEFAULTS["tax_rate_pct"],
-        "hoi_annual": FL_DEFAULTS["hoi_annual"], "hoa_monthly": 0.0
-    })
+    ss.setdefault("borrower_names", {1: "Borrower 1", 2: "Borrower 2"})
+    # dynamic row storage for calculators
+    ss.setdefault("w2_rows", [])
+    ss.setdefault("schc_rows", [])
+    ss.setdefault("k1_rows", [])
+    ss.setdefault("c1120_rows", [])
+    ss.setdefault("rental_rows", [])
+    ss.setdefault("other_rows", [])
+    ss.setdefault("debt_rows", [])
+    ss.setdefault(
+        "housing",
+        {
+            "purchase_price": 500000.0,
+            "down_payment_amt": 100000.0,
+            "rate_pct": 6.75,
+            "term_years": 30,
+            "tax_rate_pct": FL_DEFAULTS["tax_rate_pct"],
+            "hoi_annual": FL_DEFAULTS["hoi_annual"],
+            "hoa_monthly": 0.0,
+        },
+    )
     ss.setdefault("override_reason", "")
 
 init_state()
@@ -111,94 +311,244 @@ with st.sidebar:
 st.title("AMALO MORTGAGE INCOME & DTI DASHBOARD")
 st.caption("Florida-friendly defaults • Program-aware calculations • Guardrails & warnings • Exports")
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
-    "W‑2 / Base", "Sch C (1040)","K‑1 (1065/1120S)","1120 C‑Corp","Rentals (Sch E)","Other Income",
-    "Payment & Housing","Other Debts","Dashboard","Max Qualifiers"
-])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs(
+    [
+        "W‑2 / Base",
+        "Sch C (1040)",
+        "K‑1 (1065/1120S)",
+        "1120 C‑Corp",
+        "Rentals (Sch E)",
+        "Other Income",
+        "Payment & Housing",
+        "Other Debts",
+        "Dashboard",
+        "Max Qualifiers",
+    ]
+)
 
 with tab1:
-    st.subheader("W‑2 / Base Employment")
-    st.write("Use IncludeVariable=1 when variable income is stable (YTD + LY / months).")
-    st.session_state.w2 = st.data_editor(st.session_state.w2, num_rows="dynamic", use_container_width=True)
+    w2_fields = [
+        ("BorrowerID", "number", None),
+        ("Employer", "text", None),
+        ("PayType", "select", ["Salary", "Hourly"]),
+        ("AnnualSalary", "number", None),
+        ("HourlyRate", "number", None),
+        ("HoursPerWeek", "number", None),
+        ("OT_YTD", "number", None),
+        ("Bonus_YTD", "number", None),
+        ("Comm_YTD", "number", None),
+        ("Months_YTD", "number", None),
+        ("OT_LY", "number", None),
+        ("Bonus_LY", "number", None),
+        ("Comm_LY", "number", None),
+        ("Months_LY", "number", None),
+        ("IncludeVariable", "checkbox", None),
+    ]
+    render_income_tab("w2_rows", w2_fields, "W‑2 / Base Employment")
 
 with tab2:
-    st.subheader("Self‑Employed — Schedule C (two-year analysis)")
-    st.session_state.schc = st.data_editor(st.session_state.schc, num_rows="dynamic", use_container_width=True)
+    schc_fields = [
+        ("BorrowerID", "number", None),
+        ("BusinessName", "text", None),
+        ("Year", "number", None),
+        ("NetProfit", "number", None),
+        ("Nonrecurring", "number", None),
+        ("Depletion", "number", None),
+        ("Depreciation", "number", None),
+        ("NonDedMeals", "number", None),
+        ("UseOfHome", "number", None),
+        ("AmortCasualty", "number", None),
+        ("BusinessMiles", "number", None),
+        ("MileDepRate", "number", None),
+    ]
+    render_income_tab("schc_rows", schc_fields, "Self‑Employed — Schedule C (two‑year analysis)")
 
 with tab3:
     st.subheader("Partnerships & S Corps — K‑1")
-    c1,c2 = st.columns(2)
-    st.session_state.k1_verified_distributions = c1.checkbox("Verified distributions history")
-    st.session_state.k1_analyzed_liquidity = c2.checkbox("Analyzed business liquidity (if no distributions)")
-    st.session_state.k1 = st.data_editor(st.session_state.k1, num_rows="dynamic", use_container_width=True)
+    c1, c2 = st.columns(2)
+    st.session_state.k1_verified_distributions = c1.checkbox(
+        "Verified distributions history", value=bool(st.session_state.k1_verified_distributions)
+    )
+    st.session_state.k1_analyzed_liquidity = c2.checkbox(
+        "Analyzed business liquidity (if no distributions)",
+        value=bool(st.session_state.k1_analyzed_liquidity),
+    )
+    k1_fields = [
+        ("BorrowerID", "number", None),
+        ("EntityName", "text", None),
+        ("Year", "number", None),
+        ("Type", "select", ["1065", "1120S"]),
+        ("OwnershipPct", "number", None),
+        ("Ordinary", "number", None),
+        ("NetRentalOther", "number", None),
+        ("GuaranteedPmt", "number", None),
+        ("Nonrecurring", "number", None),
+        ("Depreciation", "number", None),
+        ("Depletion", "number", None),
+        ("AmortCasualty", "number", None),
+        ("NotesLT1yr", "number", None),
+        ("NonDed_TandE", "number", None),
+    ]
+    render_income_tab("k1_rows", k1_fields, "K‑1 Income")
 
 with tab4:
     st.subheader("Regular Corporation — 1120 (100% owner only)")
-    st.warning("Only include entities where the borrower owns 100%. The app filters 1120 entries to >=100%.")
-    st.session_state.c1120 = st.data_editor(st.session_state.c1120, num_rows="dynamic", use_container_width=True)
+    st.warning(
+        "Only include entities where the borrower owns 100%. Entries with <100% ownership are ignored."
+    )
+    c1120_fields = [
+        ("BorrowerID", "number", None),
+        ("CorpName", "text", None),
+        ("Year", "number", None),
+        ("OwnershipPct", "number", None),
+        ("TaxableIncome", "number", None),
+        ("TotalTax", "number", None),
+        ("Nonrecurring", "number", None),
+        ("OtherIncLoss", "number", None),
+        ("Depreciation", "number", None),
+        ("Depletion", "number", None),
+        ("AmortCasualty", "number", None),
+        ("NotesLT1yr", "number", None),
+        ("NonDed_TandE", "number", None),
+        ("DividendsPaid", "number", None),
+    ]
+    render_income_tab("c1120_rows", c1120_fields, "C‑Corporation (1120)")
 
 with tab5:
     st.subheader("Rental Income — Policy")
-    st.session_state.rental_method = st.radio("Method", ["ScheduleE","SeventyFivePctGross"], horizontal=True)
-    st.session_state.subject_market_rent = st.number_input("Subject Market Rent (if applicable)", value=float(st.session_state.subject_market_rent), step=50.0)
-    st.session_state.rentals = st.data_editor(st.session_state.rentals, num_rows="dynamic", use_container_width=True)
+    st.session_state.rental_method = st.radio(
+        "Method",
+        ["ScheduleE", "SeventyFivePctGross"],
+        horizontal=True,
+        index=0 if st.session_state.rental_method == "ScheduleE" else 1,
+    )
+    st.session_state.subject_market_rent = st.number_input(
+        "Subject Market Rent (if applicable)",
+        value=float(st.session_state.subject_market_rent),
+        step=50.0,
+    )
+    rental_fields = [
+        ("BorrowerID", "number", None),
+        ("Property", "text", None),
+        ("Year", "number", None),
+        ("Rents", "number", None),
+        ("Expenses", "number", None),
+        ("Depreciation", "number", None),
+    ]
+    render_income_tab("rental_rows", rental_fields, "Rental Property")
 
 with tab6:
     st.subheader("Other Qualifying Income")
-    st.session_state.other = st.data_editor(st.session_state.other, num_rows="dynamic", use_container_width=True)
-    st.session_state.support_continuance_ok = st.checkbox("Support income (if any) has ≥3 years continuance")
+    other_fields = [
+        ("BorrowerID", "number", None),
+        ("Type", "text", None),
+        ("GrossMonthly", "number", None),
+        ("GrossUpPct", "number", None),
+    ]
+    render_income_tab("other_rows", other_fields, "Other Income")
+    st.session_state.support_continuance_ok = st.checkbox(
+        "Support income (if any) has ≥3 years continuance",
+        value=bool(st.session_state.support_continuance_ok),
+    )
 
 with tab7:
     st.subheader("Payment & Proposed Housing (Program‑Aware)")
     H = st.session_state.housing
-    c1,c2,c3 = st.columns(3)
-    H['purchase_price'] = c1.number_input("Purchase Price ($)", value=float(H['purchase_price']), step=1000.0)
-    H['down_payment_amt'] = c2.number_input("Down Payment Amount ($)", value=float(H['down_payment_amt']), step=1000.0)
-    H['rate_pct'] = c3.number_input("Interest Rate (%)", value=float(H['rate_pct']), step=0.125)
-    c4,c5,c6 = st.columns(3)
-    H['term_years'] = c4.number_input("Term (years)", value=int(H['term_years']), step=5)
-    H['tax_rate_pct'] = c5.number_input("Property Tax Rate (%)", value=float(H['tax_rate_pct']), step=0.05)
-    H['hoi_annual'] = c6.number_input("Homeowners Insurance (Annual $)", value=float(H['hoi_annual']), step=50.0)
-    c7,c8 = st.columns(2)
-    H['hoa_monthly'] = c7.number_input("HOA/Condo Dues (Monthly $)", value=float(H['hoa_monthly']), step=10.0)
-    dp_amt = float(H['down_payment_amt'])
-    base_loan = max(0.0, float(H['purchase_price']) - dp_amt)
-    conv_tbl = st.session_state.program_tables['conventional_mi']
-    fha_tbls = st.session_state.program_tables['fha']
-    va_tbl = st.session_state.program_tables['va']
-    usda_tbl = st.session_state.program_tables['usda']
+    c1, c2, c3 = st.columns(3)
+    H["purchase_price"] = c1.number_input(
+        "Purchase Price ($)", value=float(H["purchase_price"]), step=1000.0
+    )
+    H["down_payment_amt"] = c2.number_input(
+        "Down Payment Amount ($)", value=float(H["down_payment_amt"]), step=1000.0
+    )
+    H["rate_pct"] = c3.number_input(
+        "Interest Rate (%)", value=float(H["rate_pct"]), step=0.125
+    )
+    c4, c5, c6 = st.columns(3)
+    H["term_years"] = c4.number_input(
+        "Term (years)", value=int(H["term_years"]), step=5
+    )
+    H["tax_rate_pct"] = c5.number_input(
+        "Property Tax Rate (%)", value=float(H["tax_rate_pct"]), step=0.05
+    )
+    H["hoi_annual"] = c6.number_input(
+        "Homeowners Insurance (Annual $)", value=float(H["hoi_annual"]), step=50.0
+    )
+    c7, c8 = st.columns(2)
+    H["hoa_monthly"] = c7.number_input(
+        "HOA/Condo Dues (Monthly $)", value=float(H["hoa_monthly"]), step=10.0
+    )
+    dp_amt = float(H["down_payment_amt"])
+    base_loan = max(0.0, float(H["purchase_price"]) - dp_amt)
+    conv_tbl = st.session_state.program_tables["conventional_mi"]
+    fha_tbls = st.session_state.program_tables["fha"]
+    va_tbl = st.session_state.program_tables["va"]
+    usda_tbl = st.session_state.program_tables["usda"]
     fees = piti_components(
-        st.session_state.program, H['purchase_price'], base_loan, H['rate_pct'], H['term_years'],
-        H['tax_rate_pct'], H['hoi_annual'], H['hoa_monthly'],
-        conv_tbl, fha_tbls, va_tbl, usda_tbl,
-        st.session_state.finance_upfront, st.session_state.first_use_va, st.session_state.fico_bucket
+        st.session_state.program,
+        H["purchase_price"],
+        base_loan,
+        H["rate_pct"],
+        H["term_years"],
+        H["tax_rate_pct"],
+        H["hoi_annual"],
+        H["hoa_monthly"],
+        conv_tbl,
+        fha_tbls,
+        va_tbl,
+        usda_tbl,
+        st.session_state.finance_upfront,
+        st.session_state.first_use_va,
+        st.session_state.fico_bucket,
     )
     st.write(f"**Base Loan (before upfront):** ${base_loan:,.0f}")
-    st.write(f"**Adjusted Loan (after financed fee if applicable):** ${fees['adjusted_loan']:,.0f}")
+    st.write(
+        f"**Adjusted Loan (after financed fee if applicable):** ${fees['adjusted_loan']:,.0f}"
+    )
     st.write(f"**LTV (base): {fees['ltv']:.2f}%**")
-    st.write(f"**P&I:** ${fees['pi']:,.2f} | **Taxes:** ${fees['taxes']:,.2f} | **HOI:** ${fees['hoi']:,.2f} | **HOA:** ${fees['hoa']:,.2f} | **MI/MIP/Annual:** ${fees['mi']:,.2f}")
-    st.write(f"**Proposed Housing (PITI + HOA + MI): ${fees['total']:,.2f}**")
-    if fees['upfront_amt'] > 0 and st.session_state.finance_upfront:
-        st.caption(f"Upfront financed: ${fees['upfront_amt']:,.2f}")
+    st.write(
+        f"**P&I:** ${fees['pi']:,.2f} | **Taxes:** ${fees['taxes']:,.2f} | **HOI:** ${fees['hoi']:,.2f} | **HOA:** ${fees['hoa']:,.2f} | **MI/MIP/Annual:** ${fees['mi']:,.2f}"
+    )
+    st.write(
+        f"**Proposed Housing (PITI + HOA + MI): ${fees['total']:,.2f}**"
+    )
 
 with tab8:
     st.subheader("Other Recurring Debts")
-    st.session_state.debts = st.data_editor(st.session_state.debts, num_rows="dynamic", use_container_width=True)
+    debt_fields = [
+        ("DebtName", "text", None),
+        ("MonthlyPayment", "number", None),
+    ]
+    render_income_tab("debt_rows", debt_fields, "Debt")
 
 with tab9:
     st.subheader("DTI, Warnings & Checklist")
+    # convert row data to DataFrames expected by calculators
+    w2_df = pd.DataFrame(st.session_state.w2_rows)
+    schc_df = pd.DataFrame(st.session_state.schc_rows)
+    k1_df = pd.DataFrame(st.session_state.k1_rows)
+    c1120_df = pd.DataFrame(st.session_state.c1120_rows)
+    rental_df = pd.DataFrame(st.session_state.rental_rows)
+    other_df = pd.DataFrame(st.session_state.other_rows)
+    debt_df = pd.DataFrame(st.session_state.debt_rows)
     rentals_df = rentals_policy(
-        st.session_state.rentals, method=st.session_state.rental_method,
-        subject_pitia=fees['total'], subject_market_rent=st.session_state.subject_market_rent
+        rental_df,
+        method=st.session_state.rental_method,
+        subject_pitia=fees['total'],
+        subject_market_rent=st.session_state.subject_market_rent,
     )
     incomes = combine_income(
         st.session_state.num_borrowers,
-        st.session_state.w2, st.session_state.schc, st.session_state.k1,
-        st.session_state.c1120, rentals_df, st.session_state.other
+        w2_df,
+        schc_df,
+        k1_df,
+        c1120_df,
+        rentals_df,
+        other_df,
     )
     st.dataframe(incomes, use_container_width=True)
     total_income = incomes['TotalMonthlyIncome'].sum() if not incomes.empty else 0.0
-    other_debts = 0.0 if st.session_state.debts.empty else pd.to_numeric(st.session_state.debts['MonthlyPayment'], errors='coerce').fillna(0.0).sum()
+    other_debts = 0.0 if debt_df.empty else pd.to_numeric(debt_df['MonthlyPayment'], errors='coerce').fillna(0.0).sum()
     FE, BE = dti(fees['total'], fees['total'] + other_debts, total_income)
     cols = st.columns(4)
     cols[0].metric("Total Monthly Income", f"${total_income:,.2f}")
@@ -210,20 +560,25 @@ with tab9:
     cols[1].metric("Back-End DTI", f"{BE*100:.2f}%", delta="PASS" if (BE*100) <= float(st.session_state.targets['BE']) else "CHECK")
     cols[2].metric("Target FE", f"{st.session_state.targets['FE']:.2f}%")
     cols[3].metric("Target BE", f"{st.session_state.targets['BE']:.2f}%")
-    w2_included_lt_12=False
-    if not st.session_state.w2.empty:
-        months = pd.to_numeric(st.session_state.w2['Months_YTD'], errors='coerce').fillna(0) + pd.to_numeric(st.session_state.w2['Months_LY'], errors='coerce').fillna(0)
-        included = pd.to_numeric(st.session_state.w2['IncludeVariable'], errors='coerce').fillna(0) == 1
-        if any((months < 12) & included): w2_included_lt_12=True
+    w2_included_lt_12 = False
+    if not w2_df.empty:
+        months = pd.to_numeric(w2_df['Months_YTD'], errors='coerce').fillna(0) + pd.to_numeric(w2_df['Months_LY'], errors='coerce').fillna(0)
+        included = pd.to_numeric(w2_df['IncludeVariable'], errors='coerce').fillna(0) == 1
+        if any((months < 12) & included):
+            w2_included_lt_12 = True
     w2_declining_flag = bool(incomes.get('AnyDecliningFlag', pd.Series([False])).any())
     schc_declining = bool(incomes.get('SchC_DecliningFlag', pd.Series([False])).any())
-    uses_k1 = not st.session_state.k1.empty
-    uses_c1120 = not st.session_state.c1120.empty
+    uses_k1 = not k1_df.empty
+    uses_c1120 = not c1120_df.empty
     c1120_any_lt_100 = False
     if uses_c1120:
-        own = pd.to_numeric(st.session_state.c1120['OwnershipPct'], errors='coerce').fillna(0)
+        own = pd.to_numeric(c1120_df['OwnershipPct'], errors='coerce').fillna(0)
         c1120_any_lt_100 = any(own < 100)
-    uses_support_income = any(st.session_state.other['Type'].astype(str).str.lower().str.contains("alimony|child", regex=True)) if not st.session_state.other.empty else False
+    uses_support_income = (
+        any(other_df['Type'].astype(str).str.lower().str.contains("alimony|child", regex=True))
+        if not other_df.empty
+        else False
+    )
     rental_method_conflict = False
     sanity_inputs_out_of_band = False
     if st.session_state.housing['purchase_price'] > 0:
@@ -259,22 +614,37 @@ with tab9:
         st.success("No warnings.")
     st.divider()
     checklist = []
-    if not st.session_state.w2.empty:
-        checklist += [{"label":"Most recent paystubs (30 days)","checked":False},
-                      {"label":"W-2s (2 years)","checked":False},
-                      {"label":"VOE (verbal/written)","checked":False}]
-    if not st.session_state.schc.empty or not st.session_state.k1.empty or not st.session_state.c1120.empty:
-        checklist += [{"label":"Personal tax returns (2 years)","checked":False},
-                      {"label":"Business returns (K-1/1065/1120S/1120)","checked":False}]
+    if not w2_df.empty:
+        checklist += [
+            {"label": "Most recent paystubs (30 days)", "checked": False},
+            {"label": "W-2s (2 years)", "checked": False},
+            {"label": "VOE (verbal/written)", "checked": False},
+        ]
+    if not schc_df.empty or not k1_df.empty or not c1120_df.empty:
+        checklist += [
+            {"label": "Personal tax returns (2 years)", "checked": False},
+            {"label": "Business returns (K-1/1065/1120S/1120)", "checked": False},
+        ]
     if st.session_state.k1_verified_distributions or st.session_state.k1_analyzed_liquidity:
-        checklist += [{"label":"K-1 distributions evidence or business liquidity analysis","checked":True}]
-    if not st.session_state.rentals.empty:
-        checklist += [{"label":"Leases / Market rent report","checked":False},
-                      {"label":"Schedule E pages","checked":False}]
+        checklist += [
+            {"label": "K-1 distributions evidence or business liquidity analysis", "checked": True}
+        ]
+    if not rental_df.empty:
+        checklist += [
+            {"label": "Leases / Market rent report", "checked": False},
+            {"label": "Schedule E pages", "checked": False},
+        ]
     if uses_support_income:
-        checklist += [{"label":"Court order + proof of receipt + ≥3 years continuance","checked":st.session_state.support_continuance_ok}]
-    if not st.session_state.other.empty:
-        checklist += [{"label":"Evidence of receipt/continuance for other income","checked":False}]
+        checklist += [
+            {
+                "label": "Court order + proof of receipt + ≥3 years continuance",
+                "checked": st.session_state.support_continuance_ok,
+            }
+        ]
+    if not other_df.empty:
+        checklist += [
+            {"label": "Evidence of receipt/continuance for other income", "checked": False}
+        ]
     if not checklist:
         checklist = [{"label":"Standard disclosures","checked":False}]
     st.write("**Documentation Checklist**")
@@ -362,16 +732,31 @@ with tab10:
     try:
         incomes = combine_income(
             st.session_state.num_borrowers,
-            st.session_state.w2, st.session_state.schc, st.session_state.k1,
-            st.session_state.c1120, rentals_policy(st.session_state.rentals, st.session_state.rental_method, st.session_state.subject_market_rent), st.session_state.other
+            pd.DataFrame(st.session_state.w2_rows),
+            pd.DataFrame(st.session_state.schc_rows),
+            pd.DataFrame(st.session_state.k1_rows),
+            pd.DataFrame(st.session_state.c1120_rows),
+            rentals_policy(
+                pd.DataFrame(st.session_state.rental_rows),
+                st.session_state.rental_method,
+                st.session_state.subject_market_rent,
+            ),
+            pd.DataFrame(st.session_state.other_rows),
         )
         total_income = incomes['TotalMonthlyIncome'].sum()
     except Exception:
         total_income = 0.0
-    rate = st.number_input("Rate (%)", value=float(st.session_state.housing['rate_pct']), step=0.125, key="solver_rate")
-    term = st.number_input("Term (years)", value=int(st.session_state.housing['term_years']), step=5, key="solver_term")
-    taxes_ins_hoa_mi = st.number_input("Taxes + Insurance + HOA + MI (monthly)", value=0.0, step=25.0)
-    other_debts = 0.0 if st.session_state.debts.empty else pd.to_numeric(st.session_state.debts['MonthlyPayment'], errors='coerce').fillna(0.0).sum()
+    rate = st.number_input(
+        "Rate (%)", value=float(st.session_state.housing['rate_pct']), step=0.125, key="solver_rate"
+    )
+    term = st.number_input(
+        "Term (years)", value=int(st.session_state.housing['term_years']), step=5, key="solver_term"
+    )
+    taxes_ins_hoa_mi = st.number_input(
+        "Taxes + Insurance + HOA + MI (monthly)", value=0.0, step=25.0
+    )
+    debt_df = pd.DataFrame(st.session_state.debt_rows)
+    other_debts = 0.0 if debt_df.empty else pd.to_numeric(debt_df['MonthlyPayment'], errors='coerce').fillna(0.0).sum()
     targets = st.session_state.targets
     fe_max, be_max, conservative_pi = max_affordable_pi(total_income, other_debts, taxes_ins_hoa_mi, targets['FE'], targets['BE'])
     max_loan = principal_from_payment(conservative_pi, rate, term)
