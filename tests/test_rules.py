@@ -1,4 +1,3 @@
-import pytest
 from core.rules import evaluate_rules
 
 
