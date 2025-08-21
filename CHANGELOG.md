@@ -76,3 +76,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 - What-if calculator provides quick toggles for down payment, rate, and monthly debt changes.
 - Reserve requirement and DSCR helpers support investment property analyses.
+
+## [2025-08-31]
+### Added
+- Scenario comparison allows cloning the current session and tweaking rate, down payment or program to view DTI and max purchase side by side.
