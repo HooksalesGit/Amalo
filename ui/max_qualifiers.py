@@ -1,6 +1,12 @@
 import streamlit as st
-from core.calculators import dti, max_qualifying_loan, what_if_max_qualifying
-from core.presets import CONV_MI_BANDS, FHA_TABLES, VA_TABLE, USDA_TABLE
+from core.calculators import compare_scenarios, dti, max_qualifying_loan
+from core.presets import (
+    CONV_MI_BANDS,
+    FHA_TABLES,
+    VA_TABLE,
+    USDA_TABLE,
+    PROGRAM_PRESETS,
+)
 from app import fico_to_bucket
 
 
@@ -43,16 +49,16 @@ def render_max_qualifiers_view():
     )
     st.caption(f"FE DTI: {fe*100:.2f}% • BE DTI: {be*100:.2f}%")
 
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        more_down = st.checkbox("Increase down payment by $10k", key="mq_more_down")
-    with c2:
-        more_rate = st.checkbox("Increase rate by 0.25%", key="mq_more_rate")
-    with c3:
-        more_debt = st.checkbox("Add $300 monthly debt", key="mq_more_debt")
-
-    if more_down or more_rate or more_debt:
-        scenarios = what_if_max_qualifying(
+    if st.checkbox("Compare alternate scenario", key="mq_compare"):
+        alt_rate = st.number_input("Alt Rate %", value=rate, key="mq_alt_rate")
+        alt_down = st.number_input("Alt Down Payment", value=down, key="mq_alt_down")
+        alt_program = st.selectbox(
+            "Alt Program",
+            list(PROGRAM_PRESETS.keys()),
+            index=list(PROGRAM_PRESETS.keys()).index(program),
+            key="mq_alt_program",
+        )
+        scenarios = compare_scenarios(
             tot_inc,
             other_debts,
             tax_ins,
@@ -69,15 +75,14 @@ def render_max_qualifiers_view():
             True,
             True,
             fico_to_bucket(st.session_state.get("housing", {}).get("credit_score")),
+            alt_rate_pct=alt_rate,
+            alt_down_payment_amt=alt_down,
+            alt_program=alt_program,
         )
-        key = "base"
-        if more_down:
-            key = "down_payment_plus_10k"
-        if more_rate:
-            key = "rate_plus_0.25"
-        if more_debt:
-            key = "debt_plus_300"
-        alt = scenarios[key]
-        st.caption(
-            f"What-If Max Loan: ${alt['max_loan']:,.0f} • FE DTI: {alt['fe_dti']*100:.2f}% • BE DTI: {alt['be_dti']*100:.2f}%"
+        c1, c2 = st.columns(2)
+        c1.caption(
+            f"Base Max Purchase: ${scenarios['base']['max_purchase']:,.0f} • FE DTI: {scenarios['base']['fe_dti']*100:.2f}% • BE DTI: {scenarios['base']['be_dti']*100:.2f}%"
+        )
+        c2.caption(
+            f"Alt Max Purchase: ${scenarios['alt']['max_purchase']:,.0f} • FE DTI: {scenarios['alt']['fe_dti']*100:.2f}% • BE DTI: {scenarios['alt']['be_dti']*100:.2f}%"
         )

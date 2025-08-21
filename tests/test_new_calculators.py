@@ -1,4 +1,9 @@
-from core.calculators import reserve_requirement, dscr, what_if_max_qualifying
+from core.calculators import (
+    compare_scenarios,
+    dscr,
+    reserve_requirement,
+    what_if_max_qualifying,
+)
 from core.presets import CONV_MI_BANDS, FHA_TABLES, VA_TABLE, USDA_TABLE
 
 
@@ -40,3 +45,27 @@ def test_what_if_max_qualifying_changes():
     assert dp["max_loan"] >= base["max_loan"]
     assert rate["max_loan"] < base["max_loan"]
     assert debt["be_dti"] > base["be_dti"]
+
+
+def test_compare_scenarios_rate_and_down_payment():
+    res = compare_scenarios(
+        10000,
+        500,
+        300,
+        31,
+        45,
+        6.5,
+        30,
+        20000,
+        "Conventional",
+        CONV_MI_BANDS,
+        FHA_TABLES,
+        VA_TABLE,
+        USDA_TABLE,
+        True,
+        True,
+        ">=740",
+        alt_rate_pct=6.0,
+        alt_down_payment_amt=30000,
+    )
+    assert res["alt"]["max_purchase"] > res["base"]["max_purchase"]
