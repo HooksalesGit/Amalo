@@ -341,7 +341,6 @@ def default_gross_up_pct(income_type: str, program: str) -> float:
     """
 
     itype = (income_type or "").lower()
-    prog = (program or "").lower()
     if "social" in itype:
         return 25.0
     if "disability" in itype:
