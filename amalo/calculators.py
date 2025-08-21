@@ -1,6 +1,7 @@
-
 from __future__ import annotations
-import math, pandas as pd
+
+import math
+import pandas as pd
 
 
 def nz(x, default=0.0):
@@ -108,7 +109,9 @@ def w2_totals(df: pd.DataFrame) -> pd.DataFrame:
         else:
             out[c] = 0.0
     if "VarAvgMonths" in out.columns:
-        out["VarAvgMonths"] = pd.to_numeric(out["VarAvgMonths"], errors="coerce").fillna(12)
+        out["VarAvgMonths"] = pd.to_numeric(
+            out["VarAvgMonths"], errors="coerce"
+        ).fillna(12)
     else:
         out["VarAvgMonths"] = 12
 
@@ -121,10 +124,9 @@ def w2_totals(df: pd.DataFrame) -> pd.DataFrame:
         return 0.0
 
     out["BaseMonthly"] = out.apply(base_monthly, axis=1)
-    out["VarTotal"] = (
-        out[["OT_YTD", "Bonus_YTD", "Comm_YTD"]].sum(axis=1)
-        + out[["OT_LY", "Bonus_LY", "Comm_LY"]].sum(axis=1)
-    )
+    out["VarTotal"] = out[["OT_YTD", "Bonus_YTD", "Comm_YTD"]].sum(axis=1) + out[
+        ["OT_LY", "Bonus_LY", "Comm_LY"]
+    ].sum(axis=1)
     hist_months = out["Months_YTD"] + out["Months_LY"]
     out["InsufficientHistory"] = hist_months < 12
     out["VarMonths"] = hist_months
@@ -134,21 +136,19 @@ def w2_totals(df: pd.DataFrame) -> pd.DataFrame:
     ].replace(0, pd.NA)
     out["VariableMonthly"] = (out["VarTotal"] / out["VarMonths"]).fillna(0)
     out["YOY_Var_Annualized"] = (
-        (
-            out[["OT_YTD", "Bonus_YTD", "Comm_YTD"]].fillna(0).sum(axis=1)
-        )
+        (out[["OT_YTD", "Bonus_YTD", "Comm_YTD"]].fillna(0).sum(axis=1))
         / (out["Months_YTD"].replace(0, pd.NA))
         * 12
     ).fillna(0)
     out["DecliningVarFlag"] = (
-        out["OT_LY"].fillna(0)
-        + out["Bonus_LY"].fillna(0)
-        + out["Comm_LY"].fillna(0)
+        out["OT_LY"].fillna(0) + out["Bonus_LY"].fillna(0) + out["Comm_LY"].fillna(0)
     ) > (1.2 * out["YOY_Var_Annualized"])
     out["BaseAnnual"] = out["BaseMonthly"] * 12
     out["DecliningBaseFlag"] = out["Base_LY"].fillna(0) > (1.2 * out["BaseAnnual"])
     out["IncludeVariable"] = out["IncludeVariable"].fillna(0).astype(float)
-    out["QualMonthly_row"] = out["BaseMonthly"] + out["IncludeVariable"] * out["VariableMonthly"]
+    out["QualMonthly_row"] = (
+        out["BaseMonthly"] + out["IncludeVariable"] * out["VariableMonthly"]
+    )
     agg = (
         out.groupby("BorrowerID", dropna=False)
         .agg(
@@ -163,6 +163,7 @@ def w2_totals(df: pd.DataFrame) -> pd.DataFrame:
     )
     return agg
 
+
 def sch_c_totals(df: pd.DataFrame, recent_only: bool = False) -> pd.DataFrame:
     """Calculate Schedule C business income averaged to monthly amounts.
 
@@ -172,9 +173,13 @@ def sch_c_totals(df: pd.DataFrame, recent_only: bool = False) -> pd.DataFrame:
     """
 
     if df is None or df.empty:
-        return pd.DataFrame(columns=["BorrowerID", "SchC_Monthly", "SchC_DecliningFlag"])
+        return pd.DataFrame(
+            columns=["BorrowerID", "SchC_Monthly", "SchC_DecliningFlag"]
+        )
     out = df.copy()
-    out["MileageDep"] = out.apply(lambda r: nz(r.get("BusinessMiles")) * nz(r.get("MileDepRate")), axis=1)
+    out["MileageDep"] = out.apply(
+        lambda r: nz(r.get("BusinessMiles")) * nz(r.get("MileDepRate")), axis=1
+    )
     out["AdjustedAnnual"] = (
         nz_series(out.get("NetProfit"))
         + nz_series(out.get("Nonrecurring"))
@@ -185,8 +190,14 @@ def sch_c_totals(df: pd.DataFrame, recent_only: bool = False) -> pd.DataFrame:
         + nz_series(out.get("AmortCasualty"))
         + nz_series(out.get("MileageDep"))
     )
-    by_year = out.groupby(["BorrowerID", "Year"], dropna=False)["AdjustedAnnual"].sum().reset_index()
-    by_year["AdjustedAnnual"] = pd.to_numeric(by_year["AdjustedAnnual"], errors="coerce").fillna(0.0)
+    by_year = (
+        out.groupby(["BorrowerID", "Year"], dropna=False)["AdjustedAnnual"]
+        .sum()
+        .reset_index()
+    )
+    by_year["AdjustedAnnual"] = pd.to_numeric(
+        by_year["AdjustedAnnual"], errors="coerce"
+    ).fillna(0.0)
     by_year = by_year.sort_values(["BorrowerID", "Year"])
 
     def decline_flag(s: pd.Series) -> bool:
@@ -194,19 +205,28 @@ def sch_c_totals(df: pd.DataFrame, recent_only: bool = False) -> pd.DataFrame:
             return False
         return bool(s.iloc[-1] < 0.8 * s.iloc[-2])
 
-    flags = by_year.groupby("BorrowerID")["AdjustedAnnual"].apply(decline_flag).reset_index()
+    flags = (
+        by_year.groupby("BorrowerID")["AdjustedAnnual"]
+        .apply(decline_flag)
+        .reset_index()
+    )
     flags.rename(columns={"AdjustedAnnual": "SchC_DecliningFlag"}, inplace=True)
     if recent_only:
         latest = by_year.groupby("BorrowerID", dropna=False).last().reset_index()
         latest["SchC_Monthly"] = latest["AdjustedAnnual"] / 12
         res = latest[["BorrowerID", "SchC_Monthly"]]
     else:
-        avg = by_year.groupby("BorrowerID", dropna=False)["AdjustedAnnual"].mean().reset_index()
+        avg = (
+            by_year.groupby("BorrowerID", dropna=False)["AdjustedAnnual"]
+            .mean()
+            .reset_index()
+        )
         avg["SchC_Monthly"] = avg["AdjustedAnnual"] / 12
         res = avg[["BorrowerID", "SchC_Monthly"]]
     return res.merge(flags, on="BorrowerID", how="left")[
         ["BorrowerID", "SchC_Monthly", "SchC_DecliningFlag"]
     ]
+
 
 def k1_totals(df: pd.DataFrame, recent_only: bool = False) -> pd.DataFrame:
     """Average partnership or S‑corp income from K‑1 statements."""
@@ -225,8 +245,14 @@ def k1_totals(df: pd.DataFrame, recent_only: bool = False) -> pd.DataFrame:
         - nz_series(out.get("NotesLT1yr"))
         - nz_series(out.get("NonDed_TandE"))
     )
-    out["AfterOwnership"] = nz_series(out.get("OwnershipPct")) / 100 * out["AdjustedAnnual"]
-    by_year = out.groupby(["BorrowerID", "Year"], dropna=False)["AfterOwnership"].sum().reset_index()
+    out["AfterOwnership"] = (
+        nz_series(out.get("OwnershipPct")) / 100 * out["AdjustedAnnual"]
+    )
+    by_year = (
+        out.groupby(["BorrowerID", "Year"], dropna=False)["AfterOwnership"]
+        .sum()
+        .reset_index()
+    )
     by_year = by_year.sort_values(["BorrowerID", "Year"])
 
     def decline_flag(s: pd.Series) -> bool:
@@ -234,33 +260,55 @@ def k1_totals(df: pd.DataFrame, recent_only: bool = False) -> pd.DataFrame:
             return False
         return bool(s.iloc[-1] < 0.8 * s.iloc[-2])
 
-    flags = by_year.groupby("BorrowerID")["AfterOwnership"].apply(decline_flag).reset_index()
+    flags = (
+        by_year.groupby("BorrowerID")["AfterOwnership"]
+        .apply(decline_flag)
+        .reset_index()
+    )
     flags.rename(columns={"AfterOwnership": "K1_DecliningFlag"}, inplace=True)
     if recent_only:
         latest = by_year.groupby("BorrowerID", dropna=False).last().reset_index()
         latest["K1_Monthly"] = latest["AfterOwnership"] / 12
         res = latest[["BorrowerID", "K1_Monthly"]]
     else:
-        avg = by_year.groupby("BorrowerID", dropna=False)["AfterOwnership"].mean().reset_index()
+        avg = (
+            by_year.groupby("BorrowerID", dropna=False)["AfterOwnership"]
+            .mean()
+            .reset_index()
+        )
         avg["K1_Monthly"] = avg["AfterOwnership"] / 12
         res = avg[["BorrowerID", "K1_Monthly"]]
     return res.merge(flags, on="BorrowerID", how="left")[
         ["BorrowerID", "K1_Monthly", "K1_DecliningFlag"]
     ]
 
+
 def ccorp_totals(df: pd.DataFrame, recent_only: bool = False) -> pd.DataFrame:
     """Determine income from a wholly owned C‑Corporation (Form 1120)."""
 
     if df is None or df.empty:
-        return pd.DataFrame(columns=["BorrowerID","C1120_Monthly", "C1120_DecliningFlag"])
+        return pd.DataFrame(
+            columns=["BorrowerID", "C1120_Monthly", "C1120_DecliningFlag"]
+        )
     out = df.copy()
     out = out[nz_series(out.get("OwnershipPct")) >= 100].copy()
     out["AdjustedAnnual"] = (
-        nz_series(out.get("TaxableIncome")) - nz_series(out.get("TotalTax")) + nz_series(out.get("Nonrecurring")) +
-        nz_series(out.get("OtherIncLoss")) + nz_series(out.get("Depreciation")) + nz_series(out.get("Depletion")) +
-        nz_series(out.get("AmortCasualty")) - nz_series(out.get("NotesLT1yr")) - nz_series(out.get("NonDed_TandE")) - nz_series(out.get("DividendsPaid"))
+        nz_series(out.get("TaxableIncome"))
+        - nz_series(out.get("TotalTax"))
+        + nz_series(out.get("Nonrecurring"))
+        + nz_series(out.get("OtherIncLoss"))
+        + nz_series(out.get("Depreciation"))
+        + nz_series(out.get("Depletion"))
+        + nz_series(out.get("AmortCasualty"))
+        - nz_series(out.get("NotesLT1yr"))
+        - nz_series(out.get("NonDed_TandE"))
+        - nz_series(out.get("DividendsPaid"))
     )
-    by_year = out.groupby(["BorrowerID","Year"], dropna=False)["AdjustedAnnual"].sum().reset_index()
+    by_year = (
+        out.groupby(["BorrowerID", "Year"], dropna=False)["AdjustedAnnual"]
+        .sum()
+        .reset_index()
+    )
     by_year = by_year.sort_values(["BorrowerID", "Year"])
 
     def decline_flag(s: pd.Series) -> bool:
@@ -268,19 +316,28 @@ def ccorp_totals(df: pd.DataFrame, recent_only: bool = False) -> pd.DataFrame:
             return False
         return bool(s.iloc[-1] < 0.8 * s.iloc[-2])
 
-    flags = by_year.groupby("BorrowerID")["AdjustedAnnual"].apply(decline_flag).reset_index()
+    flags = (
+        by_year.groupby("BorrowerID")["AdjustedAnnual"]
+        .apply(decline_flag)
+        .reset_index()
+    )
     flags.rename(columns={"AdjustedAnnual": "C1120_DecliningFlag"}, inplace=True)
     if recent_only:
         latest = by_year.groupby("BorrowerID", dropna=False).last().reset_index()
         latest["C1120_Monthly"] = latest["AdjustedAnnual"] / 12
-        res = latest[["BorrowerID","C1120_Monthly"]]
+        res = latest[["BorrowerID", "C1120_Monthly"]]
     else:
-        avg = by_year.groupby("BorrowerID", dropna=False)["AdjustedAnnual"].mean().reset_index()
+        avg = (
+            by_year.groupby("BorrowerID", dropna=False)["AdjustedAnnual"]
+            .mean()
+            .reset_index()
+        )
         avg["C1120_Monthly"] = avg["AdjustedAnnual"] / 12
-        res = avg[["BorrowerID","C1120_Monthly"]]
+        res = avg[["BorrowerID", "C1120_Monthly"]]
     return res.merge(flags, on="BorrowerID", how="left")[
-        ["BorrowerID","C1120_Monthly", "C1120_DecliningFlag"]
+        ["BorrowerID", "C1120_Monthly", "C1120_DecliningFlag"]
     ]
+
 
 def rentals_policy(
     df: pd.DataFrame, method="ScheduleE", subject_pitia=0.0, subject_market_rent=0.0
@@ -303,7 +360,11 @@ def rentals_policy(
             - nz_series(out.get("Expenses"))
             + nz_series(out.get("Depreciation"))
         )
-        by_year = out.groupby(["BorrowerID", "Year"], dropna=False)["NetAnnual"].sum().reset_index()
+        by_year = (
+            out.groupby(["BorrowerID", "Year"], dropna=False)["NetAnnual"]
+            .sum()
+            .reset_index()
+        )
         by_year = by_year.sort_values(["BorrowerID", "Year"])
 
         def decline_flag(s: pd.Series) -> bool:
@@ -311,23 +372,34 @@ def rentals_policy(
                 return False
             return bool(s.iloc[-1] < 0.8 * s.iloc[-2])
 
-        flags = by_year.groupby("BorrowerID")["NetAnnual"].apply(decline_flag).reset_index()
+        flags = (
+            by_year.groupby("BorrowerID")["NetAnnual"].apply(decline_flag).reset_index()
+        )
         flags.rename(columns={"NetAnnual": "Rental_DecliningFlag"}, inplace=True)
-        avg = by_year.groupby("BorrowerID", dropna=False)["NetAnnual"].mean().reset_index()
+        avg = (
+            by_year.groupby("BorrowerID", dropna=False)["NetAnnual"]
+            .mean()
+            .reset_index()
+        )
         avg["Rental_Monthly"] = avg["NetAnnual"] / 12
         return avg.merge(flags, on="BorrowerID", how="left")[
             ["BorrowerID", "Rental_Monthly", "Rental_DecliningFlag"]
         ]
     else:
         out["GrossMonthly"] = nz_series(out.get("Rents")) / 12
-        agg = out.groupby("BorrowerID", dropna=False)["GrossMonthly"].sum().reset_index()
+        agg = (
+            out.groupby("BorrowerID", dropna=False)["GrossMonthly"].sum().reset_index()
+        )
         agg["Rental_Monthly"] = 0.75 * agg["GrossMonthly"]
         if nz(subject_market_rent) > 0:
             mask = agg["BorrowerID"] == 1
             if any(mask):
-                agg.loc[mask, "Rental_Monthly"] += 0.75 * nz(subject_market_rent) - nz(subject_pitia)
+                agg.loc[mask, "Rental_Monthly"] += 0.75 * nz(subject_market_rent) - nz(
+                    subject_pitia
+                )
         agg["Rental_DecliningFlag"] = False
         return agg[["BorrowerID", "Rental_Monthly", "Rental_DecliningFlag"]]
+
 
 def other_income_totals(df: pd.DataFrame) -> pd.DataFrame:
     """Aggregate miscellaneous income sources such as alimony or SSA.
@@ -345,6 +417,7 @@ def other_income_totals(df: pd.DataFrame) -> pd.DataFrame:
     agg = out.groupby("BorrowerID", dropna=False)["QualMonthly"].sum().reset_index()
     agg.rename(columns={"QualMonthly": "Other_Monthly"}, inplace=True)
     return agg
+
 
 def combine_income(
     num_borrowers: int,
@@ -365,34 +438,83 @@ def combine_income(
             R = pd.DataFrame(columns=["BorrowerID", col])
         return L.merge(R[["BorrowerID", col]], on="BorrowerID", how="left")
 
-    w2a = w2_totals(w2) if w2 is not None else pd.DataFrame(columns=["BorrowerID", "QualMonthly", "W2_DecliningVarFlag", "W2_DecliningBaseFlag"])
+    w2a = (
+        w2_totals(w2)
+        if w2 is not None
+        else pd.DataFrame(
+            columns=[
+                "BorrowerID",
+                "QualMonthly",
+                "W2_DecliningVarFlag",
+                "W2_DecliningBaseFlag",
+            ]
+        )
+    )
     w2a = w2a.rename(columns={"QualMonthly": "W2_Monthly"})
-    sca = sch_c_totals(schc, recent_only=recent_selfemp) if schc is not None else pd.DataFrame(columns=["BorrowerID", "SchC_Monthly", "SchC_DecliningFlag"])
-    k1a = k1_totals(k1, recent_only=recent_selfemp) if k1 is not None else pd.DataFrame(columns=["BorrowerID", "K1_Monthly", "K1_DecliningFlag"])
-    c1a = ccorp_totals(c1120, recent_only=recent_selfemp) if c1120 is not None else pd.DataFrame(columns=["BorrowerID", "C1120_Monthly", "C1120_DecliningFlag"])
-    ra = rentals if rentals is not None else pd.DataFrame(columns=["BorrowerID", "Rental_Monthly", "Rental_DecliningFlag"])
-    oa = other_income_totals(other) if other is not None else pd.DataFrame(columns=["BorrowerID", "Other_Monthly"])
+    sca = (
+        sch_c_totals(schc, recent_only=recent_selfemp)
+        if schc is not None
+        else pd.DataFrame(columns=["BorrowerID", "SchC_Monthly", "SchC_DecliningFlag"])
+    )
+    k1a = (
+        k1_totals(k1, recent_only=recent_selfemp)
+        if k1 is not None
+        else pd.DataFrame(columns=["BorrowerID", "K1_Monthly", "K1_DecliningFlag"])
+    )
+    c1a = (
+        ccorp_totals(c1120, recent_only=recent_selfemp)
+        if c1120 is not None
+        else pd.DataFrame(
+            columns=["BorrowerID", "C1120_Monthly", "C1120_DecliningFlag"]
+        )
+    )
+    ra = (
+        rentals
+        if rentals is not None
+        else pd.DataFrame(
+            columns=["BorrowerID", "Rental_Monthly", "Rental_DecliningFlag"]
+        )
+    )
+    oa = (
+        other_income_totals(other)
+        if other is not None
+        else pd.DataFrame(columns=["BorrowerID", "Other_Monthly"])
+    )
 
     out = base.copy()
     out = mergecol(out, w2a, "W2_Monthly")
     if "W2_DecliningVarFlag" in w2a.columns:
-        out = out.merge(w2a[["BorrowerID", "W2_DecliningVarFlag"]], on="BorrowerID", how="left")
+        out = out.merge(
+            w2a[["BorrowerID", "W2_DecliningVarFlag"]], on="BorrowerID", how="left"
+        )
     if "W2_DecliningBaseFlag" in w2a.columns:
-        out = out.merge(w2a[["BorrowerID", "W2_DecliningBaseFlag"]], on="BorrowerID", how="left")
+        out = out.merge(
+            w2a[["BorrowerID", "W2_DecliningBaseFlag"]], on="BorrowerID", how="left"
+        )
     if "W2_InsufficientVarFlag" in w2a.columns:
-        out = out.merge(w2a[["BorrowerID", "W2_InsufficientVarFlag"]], on="BorrowerID", how="left")
+        out = out.merge(
+            w2a[["BorrowerID", "W2_InsufficientVarFlag"]], on="BorrowerID", how="left"
+        )
     out = mergecol(out, sca, "SchC_Monthly")
     if "SchC_DecliningFlag" in sca.columns:
-        out = out.merge(sca[["BorrowerID", "SchC_DecliningFlag"]], on="BorrowerID", how="left")
+        out = out.merge(
+            sca[["BorrowerID", "SchC_DecliningFlag"]], on="BorrowerID", how="left"
+        )
     out = mergecol(out, k1a, "K1_Monthly")
     if "K1_DecliningFlag" in k1a.columns:
-        out = out.merge(k1a[["BorrowerID", "K1_DecliningFlag"]], on="BorrowerID", how="left")
+        out = out.merge(
+            k1a[["BorrowerID", "K1_DecliningFlag"]], on="BorrowerID", how="left"
+        )
     out = mergecol(out, c1a, "C1120_Monthly")
     if "C1120_DecliningFlag" in c1a.columns:
-        out = out.merge(c1a[["BorrowerID", "C1120_DecliningFlag"]], on="BorrowerID", how="left")
+        out = out.merge(
+            c1a[["BorrowerID", "C1120_DecliningFlag"]], on="BorrowerID", how="left"
+        )
     out = mergecol(out, ra, "Rental_Monthly")
     if "Rental_DecliningFlag" in ra.columns:
-        out = out.merge(ra[["BorrowerID", "Rental_DecliningFlag"]], on="BorrowerID", how="left")
+        out = out.merge(
+            ra[["BorrowerID", "Rental_DecliningFlag"]], on="BorrowerID", how="left"
+        )
     out = mergecol(out, oa, "Other_Monthly")
     for c in [
         "W2_Monthly",
@@ -413,17 +535,22 @@ def combine_income(
             "Other_Monthly",
         ]
     ].sum(axis=1)
-    out["AnyDecliningFlag"] = out[
-        [
-            "W2_DecliningVarFlag",
-            "W2_DecliningBaseFlag",
-            "SchC_DecliningFlag",
-            "K1_DecliningFlag",
-            "C1120_DecliningFlag",
-            "Rental_DecliningFlag",
+    out["AnyDecliningFlag"] = (
+        out[
+            [
+                "W2_DecliningVarFlag",
+                "W2_DecliningBaseFlag",
+                "SchC_DecliningFlag",
+                "K1_DecliningFlag",
+                "C1120_DecliningFlag",
+                "Rental_DecliningFlag",
+            ]
         ]
-    ].fillna(False).any(axis=1)
+        .fillna(False)
+        .any(axis=1)
+    )
     return out
+
 
 def compute_ltv(purchase_price, base_loan):
     """Compute loan‑to‑value percentage."""
@@ -450,7 +577,9 @@ def conventional_mi_factor(ltv, fico_bucket, mi_table):
 def fha_mip_factor(ltv, term_years, table):
     """Retrieve FHA annual MIP factor from lookup table."""
 
-    key = ("<=95" if ltv <= 95 else ">95") + "_" + ("<=15" if term_years <= 15 else ">15")
+    key = (
+        ("<=95" if ltv <= 95 else ">95") + "_" + ("<=15" if term_years <= 15 else ">15")
+    )
     return table.get(key, 0.55)
 
 
@@ -482,6 +611,7 @@ def usda_annual_fee_pct(table):
 
     return table.get("annual_pct", 0.35)
 
+
 def apply_program_fees(
     program,
     purchase_price,
@@ -504,7 +634,12 @@ def apply_program_fees(
     if program == "Conventional":
         mi_ann_pct = conventional_mi_factor(ltv, fico_bucket, conv_mi_tbl)
         mi_monthly = base_loan * (mi_ann_pct / 100) / 12
-        return {"adjusted_loan": base_loan, "mi_monthly": mi_monthly, "upfront_amt": 0.0, "ltv": ltv}
+        return {
+            "adjusted_loan": base_loan,
+            "mi_monthly": mi_monthly,
+            "upfront_amt": 0.0,
+            "ltv": ltv,
+        }
     if program == "FHA":
         uf_pct = fha_tables.get("ufmip_pct", 1.75)
         ann_pct = fha_mip_factor(ltv, term_years, fha_tables.get("annual_table", {}))
@@ -512,13 +647,23 @@ def apply_program_fees(
         adj = base_loan + upfront if finance_upfront else base_loan
         ltv_calc = compute_ltv(purchase_price, adj) if finance_upfront else ltv
         mi_monthly = adj * (ann_pct / 100) / 12
-        return {"adjusted_loan": adj, "mi_monthly": mi_monthly, "upfront_amt": upfront, "ltv": ltv_calc}
+        return {
+            "adjusted_loan": adj,
+            "mi_monthly": mi_monthly,
+            "upfront_amt": upfront,
+            "ltv": ltv_calc,
+        }
     if program == "VA":
         fee_pct = va_funding_fee_pct(first_use_va, down_pct, va_tbl)
         upfront = base_loan * (fee_pct / 100)
         adj = base_loan + upfront if finance_upfront else base_loan
         ltv_calc = compute_ltv(purchase_price, adj) if finance_upfront else ltv
-        return {"adjusted_loan": adj, "mi_monthly": 0.0, "upfront_amt": upfront, "ltv": ltv_calc}
+        return {
+            "adjusted_loan": adj,
+            "mi_monthly": 0.0,
+            "upfront_amt": upfront,
+            "ltv": ltv_calc,
+        }
     if program == "USDA":
         g_pct = usda_guarantee_pct(usda_tbl)
         upfront = base_loan * (g_pct / 100)
@@ -526,8 +671,18 @@ def apply_program_fees(
         ann_pct = usda_annual_fee_pct(usda_tbl)
         mi_monthly = adj * (ann_pct / 100) / 12
         ltv_calc = compute_ltv(purchase_price, adj) if finance_upfront else ltv
-        return {"adjusted_loan": adj, "mi_monthly": mi_monthly, "upfront_amt": upfront, "ltv": ltv_calc}
-    return {"adjusted_loan": base_loan, "mi_monthly": 0.0, "upfront_amt": 0.0, "ltv": ltv}
+        return {
+            "adjusted_loan": adj,
+            "mi_monthly": mi_monthly,
+            "upfront_amt": upfront,
+            "ltv": ltv_calc,
+        }
+    return {
+        "adjusted_loan": base_loan,
+        "mi_monthly": 0.0,
+        "upfront_amt": 0.0,
+        "ltv": ltv,
+    }
 
 
 def piti_components(

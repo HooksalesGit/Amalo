@@ -9,7 +9,12 @@ from export.pdf_export import build_prequal_pdf
 
 def test_requires_override_with_critical():
     data = {
-        "warnings": [{"severity": "critical", "message": "K-1 used but distributions not verified."}],
+        "warnings": [
+            {
+                "severity": "critical",
+                "message": "K-1 used but distributions not verified.",
+            }
+        ],
         "checklist": [],
     }
     with pytest.raises(ValueError):
@@ -18,7 +23,12 @@ def test_requires_override_with_critical():
 
 def test_override_included():
     data = {
-        "warnings": [{"severity": "critical", "message": "K-1 used but distributions not verified."}],
+        "warnings": [
+            {
+                "severity": "critical",
+                "message": "K-1 used but distributions not verified.",
+            }
+        ],
         "override_reason": "Borrower provided liquidity statement",
         "checklist": [],
     }

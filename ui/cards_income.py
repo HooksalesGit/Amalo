@@ -29,7 +29,9 @@ def _monthly_preview(card: dict) -> float:
 def render_income_cards() -> float:
     st.session_state.setdefault("income_cards", [])
     if st.button("Add Income Card", key="add_income_card"):
-        st.session_state.income_cards.append({"type": "w2", "payload": _default_payload("w2")})
+        st.session_state.income_cards.append(
+            {"type": "w2", "payload": _default_payload("w2")}
+        )
     total = 0.0
     for idx, card in enumerate(list(st.session_state.income_cards)):
         label = INCOME_MODELS[card["type"]][0]
@@ -61,9 +63,13 @@ def render_income_cards() -> float:
                             desc = f"Enter {f.replace('_', ' ')}"
                         st.caption(desc)
                         if isinstance(v, (int, float)):
-                            payload[f] = st.number_input("", value=float(v), key=f"inc_{idx}_{f}")
+                            payload[f] = st.number_input(
+                                "", value=float(v), key=f"inc_{idx}_{f}"
+                            )
                         else:
-                            payload[f] = st.text_input("", value=v, key=f"inc_{idx}_{f}")
+                            payload[f] = st.text_input(
+                                "", value=v, key=f"inc_{idx}_{f}"
+                            )
             preview = _monthly_preview(card)
             st.caption(f"Monthly Qualifying: ${preview:,.2f}")
             c1, c2 = st.columns(2)

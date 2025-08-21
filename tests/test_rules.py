@@ -1,4 +1,3 @@
-import pytest
 from core.rules import evaluate_rules
 
 
@@ -23,7 +22,13 @@ def test_negative_rental_income():
 
 
 def test_ratio_and_dti_limits():
-    state = {"total_income": 1000, "FE": 0.35, "BE": 0.5, "target_FE": 31, "target_BE": 45}
+    state = {
+        "total_income": 1000,
+        "FE": 0.35,
+        "BE": 0.5,
+        "target_FE": 31,
+        "target_BE": 45,
+    }
     codes = _codes(state)
     assert "HOUSING_RATIO_OVER_LIMIT" in codes
     assert "TOTAL_DTI_OVER_LIMIT" in codes

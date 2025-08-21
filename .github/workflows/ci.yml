@@ -13,5 +13,7 @@ jobs:
         with:
           python-version: '3.10'
       - run: pip install -r requirements.txt
-      - run: pip install pytest
+      - run: pip install pytest ruff black
+      - run: ruff .
+      - run: black --check .
       - run: pytest -q
