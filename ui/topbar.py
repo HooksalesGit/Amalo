@@ -1,6 +1,7 @@
 import streamlit as st
 from core.presets import PROGRAM_PRESETS
 from core.i18n import t
+from core.version import __version__
 
 
 def render_topbar():
@@ -19,7 +20,7 @@ def render_topbar():
         left, center, right = st.columns([1, 2, 1])
         lang = st.session_state.get("ui_prefs", {}).get("language", "en")
         with left:
-            st.markdown("**AMALO**")
+            st.markdown(f"**AMALO v{__version__}**")
         with center:
             program = st.selectbox(
                 t("Program", lang), list(PROGRAM_PRESETS.keys()), key="program_name"

@@ -28,23 +28,21 @@ def build_prequal_pdf(
     )
     story = []
 
-    title = branding.get("title","Prequalification Summary")
-    story += [Paragraph(f"<b>{title}</b>", styles['Title']), Spacer(1,6)]
-
+    title = branding.get("title", "Prequalification Summary")
+    story += [Paragraph(f"<b>{title}</b>", styles["Title"]), Spacer(1, 6)]
 
     if branding.get("mlo"):
         story.append(
             Paragraph(
                 f"MLO: {branding['mlo']}  |  NMLS: {branding.get('nmls','')}",
-
-                styles['Normal'],
+                styles["Normal"],
             )
         )
     if branding.get("contact"):
         story.append(
             Paragraph(
                 f"Contact: {branding['contact']}",
-                styles['Normal'],
+                styles["Normal"],
             )
         )
 
