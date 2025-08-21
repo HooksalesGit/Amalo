@@ -47,9 +47,29 @@ def render_property_column():
             h.get("term_years", 30),
         )
         st.caption(f"Monthly P&I: ${pi_only:,.2f}")
-        h["tax_rate_pct"] = st.number_input("Tax Rate %", value=float(h.get("tax_rate_pct", 0.0)))
-        h["hoi_annual"] = st.number_input("HOI Annual", value=float(h.get("hoi_annual", 0.0)))
-        h["hoa_monthly"] = st.number_input("HOA Monthly", value=float(h.get("hoa_monthly", 0.0)))
+        h["tax_rate_pct"] = st.number_input(
+            "Tax Rate %",
+            value=float(h.get("tax_rate_pct", 0.0)),
+            help="Avg Florida property tax ~1% of purchase price",
+        )
+        h["hoi_rate_pct"] = st.number_input(
+            "HOI Rate %",
+            value=float(h.get("hoi_rate_pct", 0.0)),
+            help="Enter as % of purchase price (FL avg ~1%)",
+        )
+        h["hoi_annual"] = st.number_input(
+            "HOI Annual",
+            value=float(h.get("hoi_annual", 0.0)),
+            help="Annual homeowners insurance amount",
+        )
+        if h.get("hoi_rate_pct", 0.0) > 0:
+            h["hoi_annual"] = h.get("purchase_price", 0.0) * h["hoi_rate_pct"] / 100
+            st.caption(f"Calculated HOI Annual: ${h['hoi_annual']:,.2f}")
+        h["hoa_monthly"] = st.number_input(
+            "HOA Monthly",
+            value=float(h.get("hoa_monthly", 0.0)),
+            help="Florida HOA averages ~$250/mo",
+        )
         h["finance_upfront"] = st.checkbox("Finance Upfront Fees", value=bool(h.get("finance_upfront", True)))
     base_loan = h.get("purchase_price", 0.0) - h.get("down_payment_amt", 0.0)
     comps = piti_components(
