@@ -1,7 +1,9 @@
 
 import json, io
+import re
 import streamlit as st
 import pandas as pd
+from streamlit.components.v1 import html
 from core.presets import (
     PROGRAM_PRESETS,
     CONV_MI_BANDS,
@@ -37,6 +39,39 @@ from core.models import (
     OtherIncome,
     Debt,
 )
+
+
+# ---------------------------------------------------------------------------
+# Utility helpers for UI polish and scroll preservation
+# ---------------------------------------------------------------------------
+
+
+def pretty_label(label: str) -> str:
+    """Convert field keys to more readable labels."""
+
+    label = re.sub(r"(_|-)+", " ", label)
+    return re.sub(r"(?<!^)(?=[A-Z])", " ", label).strip()
+
+
+def _restore_scroll():
+    """Restore scroll position stored in session storage."""
+
+    html(
+        """
+        <script>
+        const pos = sessionStorage.getItem('scrollPos');
+        if (pos) window.scrollTo(0, parseInt(pos));
+        </script>
+        """,
+        height=0,
+    )
+
+
+def _save_scroll_and_rerun():
+    """Persist scroll position then rerun the app."""
+
+    html("<script>sessionStorage.setItem('scrollPos', window.scrollY);</script>", height=0)
+    st.experimental_rerun()
 
 
 # ---------------------------------------------------------------------------
@@ -277,7 +312,8 @@ def render_debt_form():
 def text_input_with_help(label: str, key: str, help_key: str, value=""):
     """Text input with guidance rendered between the title and control."""
 
-    st.markdown(f"**{label}**")
+    disp = pretty_label(label)
+    st.markdown(f"<span title='{disp}'><strong>{disp}</strong></span>", unsafe_allow_html=True)
     help = FIELD_GUIDANCE.get(help_key, "")
     if help:
         st.caption(help)
@@ -293,7 +329,8 @@ def number_input_with_help(
     min_value=None,
     format=None,
 ):
-    st.markdown(f"**{label}**")
+    disp = pretty_label(label)
+    st.markdown(f"<span title='{disp}'><strong>{disp}</strong></span>", unsafe_allow_html=True)
     help = FIELD_GUIDANCE.get(help_key, "")
     if help:
         st.caption(help)
@@ -311,7 +348,8 @@ def number_input_with_help(
 def selectbox_with_help(label: str, options: list, key: str, help_key: str, index=0):
     """Selectbox with guidance rendered between the title and control."""
 
-    st.markdown(f"**{label}**")
+    disp = pretty_label(label)
+    st.markdown(f"<span title='{disp}'><strong>{disp}</strong></span>", unsafe_allow_html=True)
     help = FIELD_GUIDANCE.get(help_key, "")
     if help:
         st.caption(help)
@@ -327,7 +365,8 @@ def selectbox_with_help(label: str, options: list, key: str, help_key: str, inde
 def checkbox_with_help(label: str, key: str, help_key: str):
     """Checkbox with guidance displayed between the title and control."""
 
-    st.markdown(f"**{label}**")
+    disp = pretty_label(label)
+    st.markdown(f"<span title='{disp}'><strong>{disp}</strong></span>", unsafe_allow_html=True)
     help = FIELD_GUIDANCE.get(help_key, "")
     if help:
         st.caption(help)
@@ -342,7 +381,8 @@ def borrower_select_with_help(label: str, key: str, help_key: str, value: int = 
         index = ids.index(int(value))
     except Exception:
         index = 0
-    st.markdown(f"**{label}**")
+    disp = pretty_label(label)
+    st.markdown(f"<span title='{disp}'><strong>{disp}</strong></span>", unsafe_allow_html=True)
     help = FIELD_GUIDANCE.get(help_key, "")
     if help:
         st.caption(help)
@@ -384,11 +424,11 @@ def render_income_tab(key_name, fields, title, model_cls=None, show_header: bool
             if st.button("Remove", key=f"{key_name}_remove_{idx}"):
                 rows.pop(idx)
                 st.session_state[key_name] = rows
-                st.experimental_rerun()
-            cols = st.columns(3)
+                _save_scroll_and_rerun()
+            cols = st.columns(2)
             for f_idx, (fname, ftype, options) in enumerate(fields):
                 fkey = f"{key_name}_{idx}_{fname}"
-                target = cols[f_idx % 3]
+                target = cols[f_idx % 2]
                 with target:
                     if ftype == "text":
                         val = text_input_with_help(fname, fkey, fname, value=row.get(fname, ""))
@@ -432,9 +472,10 @@ def render_income_tab(key_name, fields, title, model_cls=None, show_header: bool
                     blank[fname] = 1
         rows.append(blank)
         st.session_state[key_name] = rows
-        st.experimental_rerun()
+        _save_scroll_and_rerun()
 
 st.set_page_config(page_title="AMALO MORTGAGE INCOME & DTI DASHBOARD", layout="wide")
+_restore_scroll()
 
 def init_state():
     ss = st.session_state
@@ -480,209 +521,9 @@ def init_state():
         },
     )
     ss.setdefault("override_reason", "")
+# --- Navigation & Layout ---
 
-init_state()
-# --- Application Layout Redesign ---
-
-st.title("AMALO MORTGAGE INCOME & DTI DASHBOARD")
-st.caption("Florida-friendly defaults • Program-aware calculations • Guardrails & warnings • Exports")
-
-app_tab, summary_tab = st.tabs(["Application", "Summary"])
-
-with app_tab:
-    top_cols = st.columns([2, 1, 1])
-    with top_cols[0]:
-        st.header("Program & Targets")
-        st.session_state.program = st.selectbox("Program", list(PROGRAM_PRESETS.keys()) + ["Jumbo"])
-        if st.button("Apply Program Presets"):
-            preset = PROGRAM_PRESETS.get(st.session_state.program, PROGRAM_PRESETS["Conventional"])
-            st.session_state.targets.update(preset)
-    st.session_state.targets["FE"] = top_cols[1].number_input(
-        "Target Front-End DTI %", value=float(st.session_state.targets["FE"]), step=0.5
-    )
-    st.session_state.targets["BE"] = top_cols[2].number_input(
-        "Target Back-End DTI %", value=float(st.session_state.targets["BE"]), step=0.5
-    )
-
-    with st.expander("Borrowers"):
-        st.session_state.num_borrowers = st.number_input(
-            "Number of Borrowers", min_value=1, max_value=6, value=int(st.session_state.num_borrowers), step=1
-        )
-        for i in range(1, st.session_state.num_borrowers + 1):
-            st.session_state.borrower_names[i] = st.text_input(
-                f"Borrower {i} name", value=st.session_state.borrower_names.get(i, f"Borrower {i}")
-            )
-
-    income_col, debt_col, property_col = st.columns(3)
-
-    with income_col:
-        st.header("Income")
-        with st.expander("W‑2 / Base Employment"):
-            render_w2_form()
-        with st.expander("Self‑Employed — Schedule C (two‑year analysis)"):
-            render_schedule_c_form()
-        with st.expander("K‑1 Income"):
-            render_k1_form()
-        with st.expander("Regular Corporation — 1120 (100% owner only)"):
-            render_corp1120_form()
-        with st.expander("Rental Income — Policy"):
-            render_rental_form()
-        with st.expander("Other Qualifying Income"):
-            render_other_income_form()
-
-    with debt_col:
-        st.header("Debts")
-        with st.expander("Other Recurring Debts"):
-            render_debt_form()
-
-    with property_col:
-        st.header("Property")
-        with st.expander("Payment & Proposed Housing", expanded=True):
-            H = st.session_state.housing
-            c1, c2, c3 = st.columns(3)
-            H["purchase_price"] = c1.number_input(
-                "Purchase Price ($)", value=float(H["purchase_price"]), step=1000.0
-            )
-            H["down_payment_amt"] = c2.number_input(
-                "Down Payment Amount ($)", value=float(H["down_payment_amt"]), step=1000.0
-            )
-            H["rate_pct"] = c3.number_input(
-                "Interest Rate (%)", value=float(H["rate_pct"]), step=0.125
-            )
-            c4, c5, c6 = st.columns(3)
-            H["term_years"] = c4.number_input(
-                "Term (years)", value=int(H["term_years"]), step=5
-            )
-            H["tax_rate_pct"] = c5.number_input(
-                "Property Tax Rate (%)", value=float(H["tax_rate_pct"]), step=0.05
-            )
-            H["hoi_annual"] = c6.number_input(
-                "Homeowners Insurance (Annual $)", value=float(H["hoi_annual"]), step=50.0
-            )
-            c7, c8 = st.columns(2)
-            H["hoa_monthly"] = c7.number_input(
-                "HOA/Condo Dues (Monthly $)", value=float(H["hoa_monthly"]), step=10.0
-            )
-            dp_amt = float(H["down_payment_amt"])
-            base_loan = max(0.0, float(H["purchase_price"]) - dp_amt)
-            conv_tbl = st.session_state.program_tables["conventional_mi"]
-            fha_tbls = st.session_state.program_tables["fha"]
-            va_tbl = st.session_state.program_tables["va"]
-            usda_tbl = st.session_state.program_tables["usda"]
-            fees = piti_components(
-                st.session_state.program,
-                H["purchase_price"],
-                base_loan,
-                H["rate_pct"],
-                H["term_years"],
-                H["tax_rate_pct"],
-                H["hoi_annual"],
-                H["hoa_monthly"],
-                conv_tbl,
-                fha_tbls,
-                va_tbl,
-                usda_tbl,
-                st.session_state.finance_upfront,
-                st.session_state.first_use_va,
-                st.session_state.fico_bucket,
-            )
-            st.write(f"**Base Loan (before upfront):** ${base_loan:,.0f}")
-            st.write(
-                f"**Adjusted Loan (after financed fee if applicable):** ${fees['adjusted_loan']:,.0f}"
-            )
-            st.write(f"**LTV (base): {fees['ltv']:.2f}%**")
-            st.write(
-                f"**P&I:** ${fees['pi']:,.2f} | **Taxes:** ${fees['taxes']:,.2f} | **HOI:** ${fees['hoi']:,.2f} | **HOA:** ${fees['hoa']:,.2f} | **MI/MIP/Annual:** ${fees['mi']:,.2f}"
-            )
-            st.write(
-                f"**Proposed Housing (PITI + HOA + MI): ${fees['total']:,.2f}**"
-            )
-        with st.expander("MI / MIP / Fees"):
-            st.session_state.fico_bucket = st.selectbox(
-                "FICO Bucket (display only)",
-                [">=740", "720-739", "700-719", "660-699", "620-659", "<620"],
-            )
-
-            mi_tab, fha_tab, va_tab, usda_tab = st.tabs(
-                [
-                    "Conventional MI Bands (annual %) by LTV",
-                    "FHA Factors",
-                    "VA Funding Fee Table (%)",
-                    "USDA Guarantee & Annual (%)",
-                ]
-            )
-
-            with mi_tab:
-                df = pd.DataFrame(
-                    [
-                        {"Band": k, "AnnualPct": v}
-                        for k, v in st.session_state.program_tables["conventional_mi"].items()
-                    ]
-                )
-                df = st.data_editor(df, use_container_width=True)
-                st.session_state.program_tables["conventional_mi"] = dict(
-                    zip(df["Band"], df["AnnualPct"])
-                )
-
-            with fha_tab:
-                cols = st.columns(2)
-                st.session_state.program_tables["fha"]["ufmip_pct"] = cols[0].number_input(
-                    "Upfront MIP (%)",
-                    value=float(st.session_state.program_tables["fha"].get("ufmip_pct", 1.75)),
-                    step=0.05,
-                )
-                tbl = st.session_state.program_tables["fha"].get("annual_table", {})
-                df = pd.DataFrame([{"Key": k, "AnnualPct": v} for k, v in tbl.items()])
-                df = st.data_editor(df, use_container_width=True)
-                st.session_state.program_tables["fha"]["annual_table"] = {
-                    r["Key"]: r["AnnualPct"] for _, r in df.iterrows()
-                }
-
-            with va_tab:
-                st.session_state.first_use_va = st.checkbox(
-                    "First Use", value=bool(st.session_state.first_use_va)
-                )
-                va = st.session_state.program_tables["va"]
-                df = pd.DataFrame([{"Key": k, "Pct": v} for k, v in va.items()])
-                df = st.data_editor(df, use_container_width=True)
-                st.session_state.program_tables["va"] = {
-                    r["Key"]: r["Pct"] for _, r in df.iterrows()
-                }
-
-            with usda_tab:
-                usda = st.session_state.program_tables["usda"]
-                c = st.columns(2)
-                usda["guarantee_pct"] = c[0].number_input(
-                    "Guarantee Fee (%)", value=float(usda.get("guarantee_pct", 1.0)), step=0.05
-                )
-                usda["annual_pct"] = c[1].number_input(
-                    "Annual Fee (%)", value=float(usda.get("annual_pct", 0.35)), step=0.05
-                )
-        with st.expander("Upfront Fees"):
-            st.session_state.finance_upfront = st.checkbox(
-                "Finance upfront fee (if applicable)", value=bool(st.session_state.finance_upfront)
-            )
-        with st.expander("Save / Load"):
-            save_btn = st.button("Download Session JSON")
-            up = st.file_uploader("Load Session JSON", type="json")
-            if save_btn:
-                snapshot = {k: v for k, v in st.session_state.items() if k not in ["forms"]}
-                st.download_button(
-                    "Download JSON",
-                    data=json.dumps(snapshot, default=str),
-                    file_name="session_export.json",
-                    mime="application/json",
-                )
-            if up is not None:
-                try:
-                    payload = json.loads(up.read())
-                    for k, v in payload.items():
-                        st.session_state[k] = v
-                    st.success("Session loaded.")
-                except Exception as e:
-                    st.error(f"Failed to load: {e}")
-with summary_tab:
-    st.subheader("DTI, Warnings & Checklist")
+def compute_results():
     w2_df = pd.DataFrame(st.session_state.w2_rows)
     schc_df = pd.DataFrame(st.session_state.schc_rows)
     k1_df = pd.DataFrame(st.session_state.k1_rows)
@@ -727,20 +568,9 @@ with summary_tab:
         rentals_df,
         other_df,
     )
-    st.dataframe(incomes, use_container_width=True)
     total_income = incomes["TotalMonthlyIncome"].sum() if not incomes.empty else 0.0
     other_debts = 0.0 if debt_df.empty else pd.to_numeric(debt_df["MonthlyPayment"], errors="coerce").fillna(0.0).sum()
     FE, BE = dti(fees["total"], fees["total"] + other_debts, total_income)
-    cols = st.columns(4)
-    cols[0].metric("Total Monthly Income", f"${total_income:,.2f}")
-    cols[1].metric("Housing (PITIA)", f"${fees['total']:,.2f}")
-    cols[2].metric("Other Debts", f"${other_debts:,.2f}")
-    cols[3].metric("All Liabilities", f"${fees['total'] + other_debts:,.2f}")
-    cols = st.columns(4)
-    cols[0].metric("Front-End DTI", f"{FE*100:.2f}%", delta="PASS" if (FE*100) <= float(st.session_state.targets['FE']) else "CHECK")
-    cols[1].metric("Back-End DTI", f"{BE*100:.2f}%", delta="PASS" if (BE*100) <= float(st.session_state.targets['BE']) else "CHECK")
-    cols[2].metric("Target FE", f"{st.session_state.targets['FE']:.2f}%")
-    cols[3].metric("Target BE", f"{st.session_state.targets['BE']:.2f}%")
     w2_included_lt_12 = False
     if not w2_df.empty:
         months = pd.to_numeric(w2_df['Months_YTD'], errors='coerce').fillna(0) + pd.to_numeric(w2_df['Months_LY'], errors='coerce').fillna(0)
@@ -755,11 +585,7 @@ with summary_tab:
     if uses_c1120:
         own = pd.to_numeric(c1120_df['OwnershipPct'], errors='coerce').fillna(0)
         c1120_any_lt_100 = any(own < 100)
-    uses_support_income = (
-        any(other_df['Type'].astype(str).str.lower().str.contains('alimony|child', regex=True))
-        if not other_df.empty
-        else False
-    )
+    uses_support_income = any(other_df['Type'].astype(str).str.lower().str.contains('alimony|child', regex=True)) if not other_df.empty else False
     rental_method_conflict = False
     sanity_inputs_out_of_band = False
     if st.session_state.housing['purchase_price'] > 0:
@@ -785,6 +611,207 @@ with summary_tab:
         "sanity_inputs_out_of_band": sanity_inputs_out_of_band,
     }
     rule_results = evaluate_rules(rule_state)
+    blocking = has_blocking(rule_results)
+    checklist = []
+    if w2_included_lt_12:
+        checklist.append({"label": "W‑2 variable income <12 months but included", "checked": False})
+    if uses_k1:
+        checklist.append({"label": "K‑1 distribution history or liquidity analyzed", "checked": st.session_state.k1_verified_distributions or st.session_state.k1_analyzed_liquidity})
+    if uses_c1120 and c1120_any_lt_100:
+        checklist.append({"label": "Ignored <100% owned C‑corps", "checked": True})
+    if uses_support_income:
+        checklist.append({"label": "Court order + proof of receipt + ≥3 years continuance", "checked": st.session_state.support_continuance_ok})
+    if not other_df.empty:
+        checklist.append({"label": "Evidence of receipt/continuance for other income", "checked": False})
+    if not checklist:
+        checklist = [{"label": "Standard disclosures", "checked": False}]
+    return {
+        "incomes": incomes,
+        "fees": fees,
+        "total_income": total_income,
+        "other_debts": other_debts,
+        "FE": FE,
+        "BE": BE,
+        "rule_results": rule_results,
+        "blocking": blocking,
+        "checklist": checklist,
+    }
+
+
+def render_property_section():
+    st.header("Property")
+    with st.expander("Payment & Proposed Housing", expanded=True):
+        H = st.session_state.housing
+        c1, c2, c3 = st.columns(3)
+        H["purchase_price"] = c1.number_input("Purchase Price ($)", value=float(H["purchase_price"]), step=1000.0)
+        H["down_payment_amt"] = c2.number_input("Down Payment Amount ($)", value=float(H["down_payment_amt"]), step=1000.0)
+        H["rate_pct"] = c3.number_input("Interest Rate (%)", value=float(H["rate_pct"]), step=0.125)
+        c4, c5, c6 = st.columns(3)
+        H["term_years"] = c4.number_input("Term (years)", value=int(H["term_years"]), step=5)
+        H["tax_rate_pct"] = c5.number_input("Property Tax Rate (%)", value=float(H["tax_rate_pct"]), step=0.05)
+        H["hoi_annual"] = c6.number_input("Homeowners Insurance (Annual $)", value=float(H["hoi_annual"]), step=50.0)
+        c7, c8 = st.columns(2)
+        H["hoa_monthly"] = c7.number_input("HOA/Condo Dues (Monthly $)", value=float(H["hoa_monthly"]), step=10.0)
+        dp_amt = float(H["down_payment_amt"])
+        base_loan = max(0.0, float(H["purchase_price"]) - dp_amt)
+        conv_tbl = st.session_state.program_tables["conventional_mi"]
+        fha_tbls = st.session_state.program_tables["fha"]
+        va_tbl = st.session_state.program_tables["va"]
+        usda_tbl = st.session_state.program_tables["usda"]
+        fees = piti_components(
+            st.session_state.program,
+            H["purchase_price"],
+            base_loan,
+            H["rate_pct"],
+            H["term_years"],
+            H["tax_rate_pct"],
+            H["hoi_annual"],
+            H["hoa_monthly"],
+            conv_tbl,
+            fha_tbls,
+            va_tbl,
+            usda_tbl,
+            st.session_state.finance_upfront,
+            st.session_state.first_use_va,
+            st.session_state.fico_bucket,
+        )
+        st.write(f"**Base Loan (before upfront):** ${base_loan:,.0f}")
+        st.write(f"**Adjusted Loan (after financed fee if applicable):** ${fees['adjusted_loan']:,.0f}")
+        st.write(f"**LTV (base): {fees['ltv']:.2f}%**")
+        st.write(
+            f"**P&I:** ${fees['pi']:,.2f} | **Taxes:** ${fees['taxes']:,.2f} | **HOI:** ${fees['hoi']:,.2f} | **HOA:** ${fees['hoa']:,.2f} | **MI/MIP/Annual:** ${fees['mi']:,.2f}"
+        )
+        st.write(f"**Proposed Housing (PITI + HOA + MI): ${fees['total']:,.2f}**")
+    with st.expander("MI / MIP / Fees"):
+        st.session_state.fico_bucket = st.selectbox(
+            "FICO Bucket (display only)",
+            [">=740", "720-739", "700-719", "660-699", "620-659", "<620"],
+        )
+        mi_tab, fha_tab, va_tab, usda_tab = st.tabs(
+            [
+                "Conventional MI Bands (annual %) by LTV",
+                "FHA Factors",
+                "VA Funding Fee Table (%)",
+                "USDA Guarantee & Annual (%)",
+            ]
+        )
+        with mi_tab:
+            df = pd.DataFrame(
+                [{"Band": k, "AnnualPct": v} for k, v in st.session_state.program_tables["conventional_mi"].items()]
+            )
+            df = st.data_editor(df, use_container_width=True)
+            st.session_state.program_tables["conventional_mi"] = dict(zip(df["Band"], df["AnnualPct"]))
+        with fha_tab:
+            cols = st.columns(2)
+            st.session_state.program_tables["fha"]["ufmip_pct"] = cols[0].number_input(
+                "Upfront MIP (%)",
+                value=float(st.session_state.program_tables["fha"].get("ufmip_pct", 1.75)),
+                step=0.05,
+            )
+            tbl = st.session_state.program_tables["fha"].get("annual_table", {})
+            df = pd.DataFrame([{"Key": k, "AnnualPct": v} for k, v in tbl.items()])
+            df = st.data_editor(df, use_container_width=True)
+            st.session_state.program_tables["fha"]["annual_table"] = {r["Key"]: r["AnnualPct"] for _, r in df.iterrows()}
+        with va_tab:
+            st.session_state.first_use_va = st.checkbox("First Use", value=bool(st.session_state.first_use_va))
+            va = st.session_state.program_tables["va"]
+            df = pd.DataFrame([{"Key": k, "Pct": v} for k, v in va.items()])
+            df = st.data_editor(df, use_container_width=True)
+            st.session_state.program_tables["va"] = {r["Key"]: r["Pct"] for _, r in df.iterrows()}
+        with usda_tab:
+            usda = st.session_state.program_tables["usda"]
+            c = st.columns(2)
+            usda["guarantee_pct"] = c[0].number_input("Guarantee Fee (%)", value=float(usda.get("guarantee_pct", 1.0)), step=0.05)
+            usda["annual_pct"] = c[1].number_input("Annual Fee (%)", value=float(usda.get("annual_pct", 0.35)), step=0.05)
+    with st.expander("Upfront Fees"):
+        st.session_state.finance_upfront = st.checkbox(
+            "Finance upfront fee (if applicable)", value=bool(st.session_state.finance_upfront)
+        )
+    with st.expander("Save / Load"):
+        save_btn = st.button("Download Session JSON")
+        up = st.file_uploader("Load Session JSON", type="json")
+        if save_btn:
+            snapshot = {k: v for k, v in st.session_state.items() if k not in ["forms"]}
+            st.download_button(
+                "Download JSON",
+                data=json.dumps(snapshot, default=str),
+                file_name="session_export.json",
+                mime="application/json",
+            )
+        if up is not None:
+            try:
+                payload = json.loads(up.read())
+                for k, v in payload.items():
+                    st.session_state[k] = v
+                st.success("Session loaded.")
+            except Exception as e:
+                st.error(f"Failed to load: {e}")
+
+def render_borrower_setup():
+    top_cols = st.columns([2, 1, 1])
+    with top_cols[0]:
+        st.header("Program & Targets")
+        st.session_state.program = st.selectbox("Program", list(PROGRAM_PRESETS.keys()) + ["Jumbo"])
+        if st.button("Apply Program Presets"):
+            preset = PROGRAM_PRESETS.get(st.session_state.program, PROGRAM_PRESETS["Conventional"])
+            st.session_state.targets.update(preset)
+    st.session_state.targets["FE"] = top_cols[1].number_input(
+        "Target Front-End DTI %", value=float(st.session_state.targets["FE"]), step=0.5
+    )
+    st.session_state.targets["BE"] = top_cols[2].number_input(
+        "Target Back-End DTI %", value=float(st.session_state.targets["BE"]), step=0.5
+    )
+    with st.expander("Borrowers"):
+        st.session_state.num_borrowers = st.number_input(
+            "Number of Borrowers", min_value=1, max_value=6, value=int(st.session_state.num_borrowers), step=1
+        )
+        for i in range(1, st.session_state.num_borrowers + 1):
+            st.session_state.borrower_names[i] = st.text_input(
+                f"Borrower {i} name", value=st.session_state.borrower_names.get(i, f"Borrower {i}")
+            )
+
+def render_income_section():
+    st.header("Income")
+    with st.expander("W‑2 / Base Employment"):
+        render_w2_form()
+    with st.expander("Self‑Employed — Schedule C (two‑year analysis)"):
+        render_schedule_c_form()
+    with st.expander("K‑1 Income"):
+        render_k1_form()
+    with st.expander("Regular Corporation — 1120 (100% owner only)"):
+        render_corp1120_form()
+    with st.expander("Rental Income — Policy"):
+        render_rental_form()
+    with st.expander("Other Qualifying Income"):
+        render_other_income_form()
+
+def render_housing_debts():
+    st.header("Debts")
+    with st.expander("Other Recurring Debts"):
+        render_debt_form()
+    st.divider()
+    render_property_section()
+
+def render_dashboard():
+    data = compute_results()
+    incomes = data["incomes"]
+    fees = data["fees"]
+    total_income = data["total_income"]
+    other_debts = data["other_debts"]
+    FE = data["FE"]
+    BE = data["BE"]
+    rule_results = data["rule_results"]
+    st.dataframe(incomes, use_container_width=True)
+    cols = st.columns(4)
+    cols[0].metric("Total Monthly Income", f"${total_income:,.2f}")
+    cols[1].metric("Housing (PITIA)", f"${fees['total']:,.2f}")
+    cols[2].metric("Other Debts", f"${other_debts:,.2f}")
+    cols[3].metric("All Liabilities", f"${fees['total'] + other_debts:,.2f}")
+    cols = st.columns(4)
+    cols[0].metric("Front-End DTI", f"{FE*100:.2f}%", delta="PASS" if (FE*100) <= float(st.session_state.targets['FE']) else "CHECK")
+    cols[1].metric("Back-End DTI", f"{BE*100:.2f}%", delta="PASS" if (BE*100) <= float(st.session_state.targets['BE']) else "CHECK")
+    cols[2].metric("Target FE", f"{st.session_state.targets['FE']:.2f}%")
+    cols[3].metric("Target BE", f"{st.session_state.targets['BE']:.2f}%")
     if rule_results:
         for r in rule_results:
             if r.severity == "critical":
@@ -796,49 +823,27 @@ with summary_tab:
     else:
         st.success("No warnings.")
     st.divider()
-    checklist = []
-    if not w2_df.empty:
-        checklist += [
-            {"label": "Most recent paystubs (30 days)", "checked": False},
-            {"label": "W-2s (2 years)", "checked": False},
-            {"label": "VOE (verbal/written)", "checked": False},
-        ]
-    if not schc_df.empty or not k1_df.empty or not c1120_df.empty:
-        checklist += [
-            {"label": "Personal tax returns (2 years)", "checked": False},
-            {"label": "Business returns (K-1/1065/1120S/1120)", "checked": False},
-        ]
-    if st.session_state.k1_verified_distributions or st.session_state.k1_analyzed_liquidity:
-        checklist += [
-            {"label": "K-1 distributions evidence or business liquidity analysis", "checked": True}
-        ]
-    if not rental_df.empty:
-        checklist += [
-            {"label": "Leases / Market rent report", "checked": False},
-            {"label": "Schedule E pages", "checked": False},
-        ]
-    if uses_support_income:
-        checklist += [
-            {
-                "label": "Court order + proof of receipt + ≥3 years continuance",
-                "checked": st.session_state.support_continuance_ok,
-            }
-        ]
-    if not other_df.empty:
-        checklist += [
-            {"label": "Evidence of receipt/continuance for other income", "checked": False}
-        ]
-    if not checklist:
-        checklist = [{"label": "Standard disclosures", "checked": False}]
     st.write("**Documentation Checklist**")
+    checklist = data["checklist"]
     for i, item in enumerate(checklist):
         checklist[i]["checked"] = st.checkbox(item["label"], value=item["checked"], key=f"chk_{i}")
-    st.divider()
+    st.session_state["checklist"] = checklist
+
+def render_exports():
+    data = compute_results()
+    incomes = data["incomes"]
+    fees = data["fees"]
+    total_income = data["total_income"]
+    other_debts = data["other_debts"]
+    FE = data["FE"]
+    BE = data["BE"]
+    rule_results = data["rule_results"]
+    blocking = data["blocking"]
+    checklist = st.session_state.get("checklist", data["checklist"])
     st.write("**Disclaimer**")
     st.caption(DISCLAIMER)
     st.divider()
     c1, c2, c3 = st.columns([2, 1, 1])
-    blocking = has_blocking(rule_results)
     if blocking:
         st.error("Critical warnings present. Provide an override reason to enable PDF export.")
         st.session_state.override_reason = c1.text_input(
@@ -849,27 +854,25 @@ with summary_tab:
 
     def make_csv_bytes():
         buf = io.StringIO()
-        summary = pd.DataFrame(
-            [
-                {
-                    "Program": st.session_state.program,
-                    "PurchasePrice": st.session_state.housing['purchase_price'],
-                    "DownPayment": st.session_state.housing['down_payment_amt'],
-                    "AdjustedLoan": fees['adjusted_loan'],
-                    "P&I": fees['pi'],
-                    "Taxes": fees['taxes'],
-                    "HOI": fees['hoi'],
-                    "HOA": fees['hoa'],
-                    "MI_MIP": fees['mi'],
-                    "HousingTotal": fees['total'],
-                    "TotalIncome": total_income,
-                    "OtherDebts": other_debts,
-                    "FrontEndDTI_pct": FE * 100,
-                    "BackEndDTI_pct": BE * 100,
-                    "Targets_FE_BE": f"{st.session_state.targets['FE']}/{st.session_state.targets['BE']}",
-                }
-            ]
-        )
+        summary = pd.DataFrame([
+            {
+                "Program": st.session_state.program,
+                "PurchasePrice": st.session_state.housing['purchase_price'],
+                "DownPayment": st.session_state.housing['down_payment_amt'],
+                "AdjustedLoan": fees['adjusted_loan'],
+                "P&I": fees['pi'],
+                "Taxes": fees['taxes'],
+                "HOI": fees['hoi'],
+                "HOA": fees['hoa'],
+                "MI_MIP": fees['mi'],
+                "HousingTotal": fees['total'],
+                "TotalIncome": total_income,
+                "OtherDebts": other_debts,
+                "FrontEndDTI_pct": FE * 100,
+                "BackEndDTI_pct": BE * 100,
+                "Targets_FE_BE": f"{st.session_state.targets['FE']}/{st.session_state.targets['BE']}",
+            }
+        ])
         summary.to_csv(buf, index=False)
         return buf.getvalue().encode("utf-8")
 
@@ -989,3 +992,47 @@ with summary_tab:
     c1.metric("Conservative Max P&I", f"${conservative_pi:,.2f}")
     c2.metric("Max Base Loan", f"${max_loan:,.0f}")
     c3.metric("Max Purchase (given DP%)", f"${max_purchase:,.0f}")
+
+init_state()
+
+if "theme" not in st.session_state:
+    st.session_state.theme = "light"
+dark_on = st.sidebar.toggle("Dark mode", value=st.session_state.theme == "dark")
+st.session_state.theme = "dark" if dark_on else "light"
+if st.session_state.theme == "dark":
+    st.markdown(
+        """
+        <style>
+        [data-testid=\"stAppViewContainer\"]{background-color:#0e1117;color:#fafafa;}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        """
+        <style>
+        [data-testid=\"stAppViewContainer\"]{background-color:#ffffff;color:#000000;}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+nav = st.sidebar.radio(
+    "Navigate",
+    ["Borrower Setup", "Income", "Housing/Debts", "Dashboard", "Exports"],
+)
+
+st.title("AMALO MORTGAGE INCOME & DTI DASHBOARD")
+st.caption("Florida-friendly defaults • Program-aware calculations • Guardrails & warnings • Exports")
+
+if nav == "Borrower Setup":
+    render_borrower_setup()
+elif nav == "Income":
+    render_income_section()
+elif nav == "Housing/Debts":
+    render_housing_debts()
+elif nav == "Dashboard":
+    render_dashboard()
+elif nav == "Exports":
+    render_exports()
