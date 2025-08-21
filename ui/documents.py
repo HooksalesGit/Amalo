@@ -1,4 +1,5 @@
 """UI helpers for documentation checklist."""
+
 from __future__ import annotations
 import re
 import streamlit as st
@@ -17,8 +18,13 @@ def render_document_checklist():
         for doc in docs:
             key = _slug(doc)
             checked = st.session_state["doc_checklist_state"].get(doc, False)
-            st.session_state["doc_checklist_state"][doc] = st.checkbox(doc, value=checked, key=f"doc_{key}")
+            st.session_state["doc_checklist_state"][doc] = st.checkbox(
+                doc, value=checked, key=f"doc_{key}"
+            )
     st.session_state["doc_checklist"] = [
-        {"label": doc, "checked": st.session_state["doc_checklist_state"].get(doc, False)}
+        {
+            "label": doc,
+            "checked": st.session_state["doc_checklist_state"].get(doc, False),
+        }
         for doc in docs
     ]

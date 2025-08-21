@@ -4,6 +4,7 @@ import streamlit as st
 
 _i18n_cache = {}
 
+
 def _load_lang(lang: str):
     if lang in _i18n_cache:
         return _i18n_cache[lang]
@@ -14,6 +15,7 @@ def _load_lang(lang: str):
     else:
         _i18n_cache[lang] = {}
     return _i18n_cache[lang]
+
 
 def t(key: str) -> str:
     """Translate a key based on current language preference."""
