@@ -4,7 +4,9 @@ from reportlab.lib.pagesizes import LETTER
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
-from core.presets import DISCLAIMER
+# Use the local presets module rather than a non-existent external "core" package.
+# This ensures the `DISCLAIMER` constant is available when generating PDFs.
+from .presets import DISCLAIMER
 
 def build_prequal_pdf(out_path: str, branding: dict, summary: dict, incomes_table: list[list], warnings: list[dict], checklist: list[dict]):
     styles = getSampleStyleSheet()
