@@ -99,3 +99,7 @@ class Housing(BaseModel):
     tax_rate_pct: float = 1.0
     hoi_annual: float = 1200.0
     hoa_monthly: float = 0.0
+    hoi_rate_pct: float = 0.0
+    finance_upfront: bool = True
+    credit_score: float = 760.0
+    first_use_va: bool = True

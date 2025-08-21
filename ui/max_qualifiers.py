@@ -1,7 +1,7 @@
 import streamlit as st
 from core.calculators import max_qualifying_loan
 from core.presets import CONV_MI_BANDS, FHA_TABLES, VA_TABLE, USDA_TABLE
-from app import fico_to_bucket
+from core.utils import fico_to_bucket
 
 
 def render_max_qualifiers_view():

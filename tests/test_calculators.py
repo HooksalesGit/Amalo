@@ -253,3 +253,10 @@ def test_filter_support_income():
     assert all(~flt["Type"].str.lower().str.contains("alimony|housing"))
     assert len(flt) == 1
 
+
+def test_dti_negative_income():
+    from core.calculators import dti
+
+    fe, be = dti(1000, 2000, -5000)
+    assert fe == 0 and be == 0
+
