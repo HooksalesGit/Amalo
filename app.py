@@ -255,7 +255,8 @@ def render_w2_form():
         st.session_state["w2_rows"] = rows
     for idx, row in enumerate(rows):
         title = row.get("Employer") or f"Job {idx + 1}"
-        with st.expander(title, expanded=True):
+        with st.container():
+            st.subheader(title)
             form_key = f"w2_job_{idx}"
             with st.form(form_key):
                 cols = st.columns(3)
