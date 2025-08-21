@@ -77,6 +77,12 @@ All notable changes to this project will be documented in this file.
 - What-if calculator provides quick toggles for down payment, rate, and monthly debt changes.
 - Reserve requirement and DSCR helpers support investment property analyses.
 
-## [2025-08-31]
+
+## [0.1.1] - 2025-08-31
+### Fixed
+- Bottom bar view switches no longer raise a ``StreamlitAPIException`` by separating
+  widget and session state keys.
+
 ### Added
 - Scenario comparison allows cloning the current session and tweaking rate, down payment or program to view DTI and max purchase side by side.
+
