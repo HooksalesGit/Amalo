@@ -4,7 +4,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from core.calculators import (
+from amalo.calculators import (
     monthly_payment,
     principal_from_payment,
     max_affordable_pi,
@@ -12,7 +12,7 @@ from core.calculators import (
     apply_program_fees,
     sch_c_totals,
 )
-from core.presets import CONV_MI_BANDS, FHA_TABLES, VA_TABLE, USDA_TABLE
+from amalo.presets import CONV_MI_BANDS, FHA_TABLES, VA_TABLE, USDA_TABLE
 
 
 def test_amortization_inverse_roundtrip():
