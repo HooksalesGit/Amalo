@@ -12,8 +12,10 @@ class RuleResult(BaseModel):
 def evaluate_rules(state: dict) -> List[RuleResult]:
     res: List[RuleResult] = []
     total_income=float(state.get("total_income",0.0))
-    FE=float(state.get("FE",0.0))*100; BE=float(state.get("BE",0.0))*100
-    target_FE=float(state.get("target_FE",31.0)); target_BE=float(state.get("target_BE",45.0))
+    FE = float(state.get("FE", 0.0)) * 100
+    BE = float(state.get("BE", 0.0)) * 100
+    target_FE = float(state.get("target_FE", 31.0))
+    target_BE = float(state.get("target_BE", 45.0))
 
     w2_meta=state.get("w2_meta",{})
     if w2_meta.get("var_included_lt_12", False):
@@ -100,7 +102,8 @@ def evaluate_rules(state: dict) -> List[RuleResult]:
         items = sorted(income_hist.items(), key=lambda kv: int(kv[0]))
         prev_year, prev_inc = items[-2]
         curr_year, curr_inc = items[-1]
-        prev_inc = float(prev_inc); curr_inc = float(curr_inc)
+        prev_inc = float(prev_inc)
+        curr_inc = float(curr_inc)
         if prev_inc > 0 and (prev_inc - curr_inc) / prev_inc > 0.20:
             res.append(
                 RuleResult(
