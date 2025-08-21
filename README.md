@@ -50,3 +50,28 @@ debt‑to‑income calculations.
 
 These explanations are also available directly in the source code as function
 docstrings for quick reference in interactive environments.
+
+## Package layout
+
+The project separates UI from business logic to enable parallel development:
+
+- `app.py` – Streamlit user interface and form rendering helpers.
+- `amalo/` – reusable Python package containing:
+  - `calculators.py` – income and qualification calculators.
+  - `rules.py` – rule evaluation and warning helpers.
+  - `presets.py` – program presets and constant tables.
+  - `pdf_export.py` – PDF export utilities.
+  - `models.py` – Pydantic models describing form inputs.
+
+## Development
+
+Install dependencies and run the test suite with:
+
+```bash
+pip install -r requirements.txt
+pytest -q
+```
+
+New modules should live under the `amalo` package and include tests when
+appropriate. Use `render_income_tab` helpers in `app.py` for new form groups to
+maintain consistency.

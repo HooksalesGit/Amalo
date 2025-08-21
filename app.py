@@ -2,7 +2,7 @@
 import json, io
 import streamlit as st
 import pandas as pd
-from core.presets import (
+from amalo.presets import (
     PROGRAM_PRESETS,
     CONV_MI_BANDS,
     FHA_TABLES,
@@ -11,7 +11,7 @@ from core.presets import (
     DISCLAIMER,
     FL_DEFAULTS,
 )
-from core.calculators import (
+from amalo.calculators import (
     w2_totals,
     sch_c_totals,
     k1_totals,
@@ -26,8 +26,17 @@ from core.calculators import (
     principal_from_payment,
     nz,
 )
-from core.rules import evaluate_rules, has_blocking
-from core.pdf_export import build_prequal_pdf
+from amalo.rules import evaluate_rules, has_blocking
+from amalo.pdf_export import build_prequal_pdf
+from amalo.models import (
+    W2Row,
+    ScheduleCRow,
+    K1Row,
+    CCorpRow,
+    RentalRow,
+    OtherIncomeRow,
+    DebtRow,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +102,170 @@ FIELD_GUIDANCE = {
     "HOI_Annual": "Annual homeowners insurance premium.",
     "HOA_Monthly": "Monthly HOA/condo dues.",
 }
+
+# ---------------------------------------------------------------------------
+# Form field definitions and rendering helpers for various income and debt
+# categories.  Each function wraps the generic ``render_income_tab``
+# component with fields specific to that income type.  Pydantic models from
+# ``amalo.models`` provide typed defaults when adding new rows.
+# ---------------------------------------------------------------------------
+
+W2_FIELDS = [
+    ("BorrowerID", "borrower", None),
+    ("Employer", "text", None),
+    ("PayType", "select", ["Salary", "Hourly"]),
+    ("AnnualSalary", "number", None),
+    ("HourlyRate", "number", None),
+    ("HoursPerWeek", "number", None),
+    ("OT_YTD", "number", None),
+    ("Bonus_YTD", "number", None),
+    ("Comm_YTD", "number", None),
+    ("Months_YTD", "number", None),
+    ("OT_LY", "number", None),
+    ("Bonus_LY", "number", None),
+    ("Comm_LY", "number", None),
+    ("Months_LY", "number", None),
+    ("IncludeVariable", "checkbox", None),
+]
+W2_GUIDELINES = (
+    "Use for salaried or hourly employees based on W‑2s or pay stubs. "
+    "Include base pay and variable income when stable."
+)
+
+SCHC_FIELDS = [
+    ("BorrowerID", "borrower", None),
+    ("BusinessName", "text", None),
+    ("Year", "number", None),
+    ("NetProfit", "number", None),
+    ("Nonrecurring", "number", None),
+    ("Depletion", "number", None),
+    ("Depreciation", "number", None),
+    ("NonDedMeals", "number", None),
+    ("UseOfHome", "number", None),
+    ("AmortCasualty", "number", None),
+    ("BusinessMiles", "number", None),
+    ("MileDepRate", "number", None),
+]
+SCHC_GUIDELINES = (
+    "Use for sole proprietorships reporting on Schedule C. Provide two years of "
+    "history and adjust for allowable add‑backs."
+)
+
+K1_FIELDS = [
+    ("BorrowerID", "borrower", None),
+    ("EntityName", "text", None),
+    ("Year", "number", None),
+    ("Type", "select", ["1065", "1120S"]),
+    ("OwnershipPct", "number", None),
+    ("Ordinary", "number", None),
+    ("NetRentalOther", "number", None),
+    ("GuaranteedPmt", "number", None),
+    ("Nonrecurring", "number", None),
+    ("Depreciation", "number", None),
+    ("Depletion", "number", None),
+    ("AmortCasualty", "number", None),
+    ("NotesLT1yr", "number", None),
+    ("NonDed_TandE", "number", None),
+]
+K1_GUIDELINES = (
+    "Use for partnership or S‑Corporation K‑1 earnings. Verify distribution "
+    "history or analyze business liquidity."
+)
+
+C1120_FIELDS = [
+    ("BorrowerID", "borrower", None),
+    ("CorpName", "text", None),
+    ("Year", "number", None),
+    ("OwnershipPct", "number", None),
+    ("TaxableIncome", "number", None),
+    ("TotalTax", "number", None),
+    ("Nonrecurring", "number", None),
+    ("OtherIncLoss", "number", None),
+    ("Depreciation", "number", None),
+    ("Depletion", "number", None),
+    ("AmortCasualty", "number", None),
+    ("NotesLT1yr", "number", None),
+    ("NonDed_TandE", "number", None),
+    ("DividendsPaid", "number", None),
+]
+
+RENTAL_FIELDS = [
+    ("BorrowerID", "borrower", None),
+    ("Property", "text", None),
+    ("Year", "number", None),
+    ("Rents", "number", None),
+    ("Expenses", "number", None),
+    ("Depreciation", "number", None),
+]
+
+OTHER_FIELDS = [
+    ("BorrowerID", "borrower", None),
+    ("Type", "text", None),
+    ("GrossMonthly", "number", None),
+    ("GrossUpPct", "number", None),
+]
+
+DEBT_FIELDS = [
+    ("DebtName", "text", None),
+    ("MonthlyPayment", "number", None),
+]
+
+
+def render_w2_form():
+    st.caption(W2_GUIDELINES)
+    render_income_tab("w2_rows", W2_FIELDS, "W‑2 / Base Employment", model_cls=W2Row, show_header=False)
+
+
+def render_schedule_c_form():
+    st.caption(SCHC_GUIDELINES)
+    render_income_tab("schc_rows", SCHC_FIELDS, "Self‑Employed — Schedule C (two‑year analysis)", model_cls=ScheduleCRow, show_header=False)
+
+
+def render_k1_form():
+    st.caption(K1_GUIDELINES)
+    c1, c2 = st.columns(2)
+    st.session_state.k1_verified_distributions = c1.checkbox(
+        "Verified distributions history", value=bool(st.session_state.k1_verified_distributions)
+    )
+    st.session_state.k1_analyzed_liquidity = c2.checkbox(
+        "Analyzed business liquidity (if no distributions)",
+        value=bool(st.session_state.k1_analyzed_liquidity),
+    )
+    render_income_tab("k1_rows", K1_FIELDS, "K‑1 Income", model_cls=K1Row, show_header=False)
+
+
+def render_corp1120_form():
+    st.warning(
+        "Only include entities where the borrower owns 100%. Entries with <100% ownership are ignored."
+    )
+    render_income_tab("c1120_rows", C1120_FIELDS, "C‑Corporation (1120)", model_cls=CCorpRow, show_header=False)
+
+
+def render_rental_form():
+    st.session_state.rental_method = st.radio(
+        "Method",
+        ["ScheduleE", "SeventyFivePctGross"],
+        horizontal=True,
+        index=0 if st.session_state.rental_method == "ScheduleE" else 1,
+    )
+    st.session_state.subject_market_rent = st.number_input(
+        "Subject Market Rent (if applicable)",
+        value=float(st.session_state.subject_market_rent),
+        step=50.0,
+    )
+    render_income_tab("rental_rows", RENTAL_FIELDS, "Rental Property", model_cls=RentalRow, show_header=False)
+
+
+def render_other_income_form():
+    render_income_tab("other_rows", OTHER_FIELDS, "Other Income", model_cls=OtherIncomeRow, show_header=False)
+    st.session_state.support_continuance_ok = st.checkbox(
+        "Support income (if any) has ≥3 years continuance",
+        value=bool(st.session_state.support_continuance_ok),
+    )
+
+
+def render_debt_form():
+    render_income_tab("debt_rows", DEBT_FIELDS, "Debt", model_cls=DebtRow, show_header=False)
 
 
 # ---------------------------------------------------------------------------
@@ -183,7 +356,7 @@ def borrower_select_with_help(label: str, key: str, help_key: str, value: int = 
     )
 
 
-def render_income_tab(key_name, fields, title, show_header: bool = True):
+def render_income_tab(key_name, fields, title, model_cls=None, show_header: bool = True):
     """Render a dynamic list of entries for a given income/debt type.
 
     Parameters
@@ -242,18 +415,21 @@ def render_income_tab(key_name, fields, title, show_header: bool = True):
         st.divider()
 
     if st.button(f"Add {title} Entry", key=f"add_{key_name}"):
-        blank = {}
-        for fname, ftype, opts in fields:
-            if ftype == "number":
-                blank[fname] = 0.0
-            elif ftype == "text":
-                blank[fname] = ""
-            elif ftype == "select":
-                blank[fname] = opts[0] if opts else ""
-            elif ftype == "checkbox":
-                blank[fname] = False
-            elif ftype == "borrower":
-                blank[fname] = 1
+        if model_cls is not None:
+            blank = model_cls().model_dump()
+        else:
+            blank = {}
+            for fname, ftype, opts in fields:
+                if ftype == "number":
+                    blank[fname] = 0.0
+                elif ftype == "text":
+                    blank[fname] = ""
+                elif ftype == "select":
+                    blank[fname] = opts[0] if opts else ""
+                elif ftype == "checkbox":
+                    blank[fname] = False
+                elif ftype == "borrower":
+                    blank[fname] = 1
         rows.append(blank)
         st.session_state[key_name] = rows
         st.experimental_rerun()
@@ -311,80 +487,6 @@ init_state()
 st.title("AMALO MORTGAGE INCOME & DTI DASHBOARD")
 st.caption("Florida-friendly defaults • Program-aware calculations • Guardrails & warnings • Exports")
 
-INCOME_FORMS = {
-    "W‑2": {
-        "key": "w2_rows",
-        "title": "W‑2 / Base Employment",
-        "guidelines": (
-            "Use for salaried or hourly employees based on W‑2s or pay stubs. "
-            "Include base pay and variable income when stable."
-        ),
-        "fields": [
-            ("BorrowerID", "borrower", None),
-            ("Employer", "text", None),
-            ("PayType", "select", ["Salary", "Hourly"]),
-            ("AnnualSalary", "number", None),
-            ("HourlyRate", "number", None),
-            ("HoursPerWeek", "number", None),
-            ("OT_YTD", "number", None),
-            ("Bonus_YTD", "number", None),
-            ("Comm_YTD", "number", None),
-            ("Months_YTD", "number", None),
-            ("OT_LY", "number", None),
-            ("Bonus_LY", "number", None),
-            ("Comm_LY", "number", None),
-            ("Months_LY", "number", None),
-            ("IncludeVariable", "checkbox", None),
-        ],
-    },
-    "Sch C": {
-        "key": "schc_rows",
-        "title": "Self‑Employed — Schedule C (two‑year analysis)",
-        "guidelines": (
-            "Use for sole proprietorships reporting on Schedule C. "
-            "Provide two years of history and adjust for allowable add‑backs."
-        ),
-        "fields": [
-            ("BorrowerID", "borrower", None),
-            ("BusinessName", "text", None),
-            ("Year", "number", None),
-            ("NetProfit", "number", None),
-            ("Nonrecurring", "number", None),
-            ("Depletion", "number", None),
-            ("Depreciation", "number", None),
-            ("NonDedMeals", "number", None),
-            ("UseOfHome", "number", None),
-            ("AmortCasualty", "number", None),
-            ("BusinessMiles", "number", None),
-            ("MileDepRate", "number", None),
-        ],
-    },
-    "K‑1": {
-        "key": "k1_rows",
-        "title": "K‑1 Income",
-        "guidelines": (
-            "Use for partnership or S‑Corporation K‑1 earnings. "
-            "Verify distribution history or analyze business liquidity."
-        ),
-        "fields": [
-            ("BorrowerID", "borrower", None),
-            ("EntityName", "text", None),
-            ("Year", "number", None),
-            ("Type", "select", ["1065", "1120S"]),
-            ("OwnershipPct", "number", None),
-            ("Ordinary", "number", None),
-            ("NetRentalOther", "number", None),
-            ("GuaranteedPmt", "number", None),
-            ("Nonrecurring", "number", None),
-            ("Depreciation", "number", None),
-            ("Depletion", "number", None),
-            ("AmortCasualty", "number", None),
-            ("NotesLT1yr", "number", None),
-            ("NonDed_TandE", "number", None),
-        ],
-    },
-}
-
 app_tab, summary_tab = st.tabs(["Application", "Summary"])
 
 with app_tab:
@@ -415,89 +517,23 @@ with app_tab:
 
     with income_col:
         st.header("Income")
-        info = INCOME_FORMS["W‑2"]
-        with st.expander(info["title"]):
-            st.caption(info["guidelines"])
-            render_income_tab(info["key"], info["fields"], info["title"], show_header=False)
-        info = INCOME_FORMS["Sch C"]
-        with st.expander(info["title"]):
-            st.caption(info["guidelines"])
-            render_income_tab(info["key"], info["fields"], info["title"], show_header=False)
-        info = INCOME_FORMS["K‑1"]
-        with st.expander(info["title"]):
-            st.caption(info["guidelines"])
-            c1, c2 = st.columns(2)
-            st.session_state.k1_verified_distributions = c1.checkbox(
-                "Verified distributions history", value=bool(st.session_state.k1_verified_distributions)
-            )
-            st.session_state.k1_analyzed_liquidity = c2.checkbox(
-                "Analyzed business liquidity (if no distributions)",
-                value=bool(st.session_state.k1_analyzed_liquidity),
-            )
-            render_income_tab(info["key"], info["fields"], info["title"], show_header=False)
+        with st.expander("W‑2 / Base Employment"):
+            render_w2_form()
+        with st.expander("Self‑Employed — Schedule C (two‑year analysis)"):
+            render_schedule_c_form()
+        with st.expander("K‑1 Income"):
+            render_k1_form()
         with st.expander("Regular Corporation — 1120 (100% owner only)"):
-            st.warning(
-                "Only include entities where the borrower owns 100%. Entries with <100% ownership are ignored."
-            )
-            c1120_fields = [
-                ("BorrowerID", "borrower", None),
-                ("CorpName", "text", None),
-                ("Year", "number", None),
-                ("OwnershipPct", "number", None),
-                ("TaxableIncome", "number", None),
-                ("TotalTax", "number", None),
-                ("Nonrecurring", "number", None),
-                ("OtherIncLoss", "number", None),
-                ("Depreciation", "number", None),
-                ("Depletion", "number", None),
-                ("AmortCasualty", "number", None),
-                ("NotesLT1yr", "number", None),
-                ("NonDed_TandE", "number", None),
-                ("DividendsPaid", "number", None),
-            ]
-            render_income_tab("c1120_rows", c1120_fields, "C‑Corporation (1120)", show_header=False)
+            render_corp1120_form()
         with st.expander("Rental Income — Policy"):
-            st.session_state.rental_method = st.radio(
-                "Method",
-                ["ScheduleE", "SeventyFivePctGross"],
-                horizontal=True,
-                index=0 if st.session_state.rental_method == "ScheduleE" else 1,
-            )
-            st.session_state.subject_market_rent = st.number_input(
-                "Subject Market Rent (if applicable)",
-                value=float(st.session_state.subject_market_rent),
-                step=50.0,
-            )
-            rental_fields = [
-                ("BorrowerID", "borrower", None),
-                ("Property", "text", None),
-                ("Year", "number", None),
-                ("Rents", "number", None),
-                ("Expenses", "number", None),
-                ("Depreciation", "number", None),
-            ]
-            render_income_tab("rental_rows", rental_fields, "Rental Property", show_header=False)
+            render_rental_form()
         with st.expander("Other Qualifying Income"):
-            other_fields = [
-                ("BorrowerID", "borrower", None),
-                ("Type", "text", None),
-                ("GrossMonthly", "number", None),
-                ("GrossUpPct", "number", None),
-            ]
-            render_income_tab("other_rows", other_fields, "Other Income", show_header=False)
-            st.session_state.support_continuance_ok = st.checkbox(
-                "Support income (if any) has ≥3 years continuance",
-                value=bool(st.session_state.support_continuance_ok),
-            )
+            render_other_income_form()
 
     with debt_col:
         st.header("Debts")
         with st.expander("Other Recurring Debts"):
-            debt_fields = [
-                ("DebtName", "text", None),
-                ("MonthlyPayment", "number", None),
-            ]
-            render_income_tab("debt_rows", debt_fields, "Debt", show_header=False)
+            render_debt_form()
 
     with property_col:
         st.header("Property")
