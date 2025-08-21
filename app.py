@@ -92,6 +92,7 @@ FIELD_GUIDANCE = {
     "Bonus_LY": "Prior year bonus earnings.",
     "Comm_LY": "Prior year commission earnings.",
     "Months_LY": "Months of variable income received last year.",
+    "VarAvgMonths": "Averaging period for variable income (12 vs 24 months).",
     "IncludeVariable": "Include variable income if stable.",
     "BusinessName": "Schedule C business name.",
     "Year": "Tax year for entry.",
@@ -161,6 +162,7 @@ W2_FIELDS = [
     ("Bonus_LY", "number", None),
     ("Comm_LY", "number", None),
     ("Months_LY", "number", None),
+    ("VarAvgMonths", "select", [12, 24]),
     ("IncludeVariable", "checkbox", None),
 ]
 W2_GUIDELINES = (
@@ -273,8 +275,16 @@ def render_w2_form():
                                 st.session_state.employer_suggestions.append(val)
                         elif ftype == "number":
                             val = number_input_with_help(
-                                fname, fkey, fname, value=float(row.get(fname, 0) or 0), step=1.0
+                                fname,
+                                fkey,
+                                fname,
+                                value=float(row.get(fname, 0) or 0),
+                                step=1.0,
+                                min_value=0.0,
                             )
+                            if fname == "HoursPerWeek" and str(row.get("PayType", "")).lower() == "hourly":
+                                monthly = float(row.get("HourlyRate", 0)) * val * 52 / 12
+                                st.caption(f"Monthly base pay: ${monthly:,.2f}")
                         elif ftype == "select":
                             current = row.get(fname, options[0] if options else "")
                             try:
@@ -299,6 +309,10 @@ def render_w2_form():
                     st.caption(
                         f"BaseMonthly: ${bm:,.2f} | VariableMonthly: ${vm:,.2f} | QualMonthly: ${qm:,.2f}"
                     )
+                    if (row.get("Months_YTD", 0) + row.get("Months_LY", 0)) < 12:
+                        st.warning(
+                            "Fewer than 12 months of variable income reported. Consider excluding variable income or obtaining more history."
+                        )
 
                 c1, c2 = st.columns(2)
                 save = c1.form_submit_button("Save")

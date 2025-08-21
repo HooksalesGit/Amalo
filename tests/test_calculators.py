@@ -11,6 +11,7 @@ from core.calculators import (
     rentals_policy,
     apply_program_fees,
     sch_c_totals,
+    w2_totals,
 )
 from core.presets import CONV_MI_BANDS, FHA_TABLES, VA_TABLE, USDA_TABLE
 
@@ -71,4 +72,57 @@ def test_sch_c_totals_declining_flag():
     b1 = bool(res.loc[res["BorrowerID"] == 1, "SchC_DecliningFlag"].iloc[0])
     b2 = bool(res.loc[res["BorrowerID"] == 2, "SchC_DecliningFlag"].iloc[0])
     assert b1 and not b2
+
+
+def test_w2_totals_avg_and_flags():
+    df = pd.DataFrame(
+        [
+            {
+                "BorrowerID": 1,
+                "PayType": "Hourly",
+                "HourlyRate": 20,
+                "HoursPerWeek": 40,
+                "OT_YTD": 1200,
+                "Bonus_YTD": 0,
+                "Comm_YTD": 0,
+                "Months_YTD": 6,
+                "OT_LY": 2400,
+                "Bonus_LY": 0,
+                "Comm_LY": 0,
+                "Months_LY": 12,
+                "VarAvgMonths": 24,
+                "IncludeVariable": 1,
+            }
+        ]
+    )
+    res = w2_totals(df)
+    bm = float(res.loc[0, "BaseMonthly"])
+    vm = float(res.loc[0, "VariableMonthly"])
+    assert round(bm, 2) == round(20 * 40 * 52 / 12, 2)
+    assert round(vm, 2) == round((1200 + 2400) / 24, 2)
+    assert not bool(res.loc[0, "W2_InsufficientVarFlag"])
+
+
+def test_w2_totals_clips_negatives_and_warns():
+    df = pd.DataFrame(
+        [
+            {
+                "BorrowerID": 1,
+                "PayType": "Salary",
+                "AnnualSalary": 60000,
+                "OT_YTD": -500,
+                "Bonus_YTD": 0,
+                "Comm_YTD": 0,
+                "Months_YTD": 2,
+                "OT_LY": 0,
+                "Bonus_LY": 0,
+                "Comm_LY": 0,
+                "Months_LY": 0,
+                "IncludeVariable": 1,
+            }
+        ]
+    )
+    res = w2_totals(df)
+    assert float(res.loc[0, "VariableMonthly"]) == 0.0
+    assert bool(res.loc[0, "W2_InsufficientVarFlag"])
 
