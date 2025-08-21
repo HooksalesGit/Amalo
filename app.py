@@ -25,8 +25,14 @@ def render_w2_form():
         st.session_state.w2_rows.append(W2().model_dump())
     for idx, row in enumerate(st.session_state.w2_rows):
         with st.expander(f"W2 #{idx+1}"):
-            for field, val in row.items():
-                st.text_input(field, value=str(val), key=f"w2_{idx}_{field}")
+            items = list(row.items())
+            for i in range(0, len(items), 2):
+                cols = st.columns(2)
+                for col_idx, (field, val) in enumerate(items[i : i + 2]):
+                    with cols[col_idx]:
+                        st.markdown(f"**{field}**")
+                        st.caption(f"Enter {field}")
+                        st.text_input("", value=str(val), key=f"w2_{idx}_{field}")
 
 
 def fico_to_bucket(score):

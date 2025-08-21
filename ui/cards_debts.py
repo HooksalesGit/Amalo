@@ -31,11 +31,18 @@ def render_debt_cards() -> float:
                 card["type"] = sel
                 card["payload"] = _default_payload(sel)
             payload = card["payload"]
-            for f, v in payload.items():
-                if isinstance(v, (int, float)):
-                    payload[f] = st.number_input(f, value=float(v), key=f"debt_{idx}_{f}")
-                else:
-                    payload[f] = st.text_input(f, value=v, key=f"debt_{idx}_{f}")
+            items = list(payload.items())
+            for i in range(0, len(items), 2):
+                cols = st.columns(2)
+                for col_idx, (f, v) in enumerate(items[i : i + 2]):
+                    with cols[col_idx]:
+                        label = f.replace("_", " ").title()
+                        st.markdown(f"**{label}**")
+                        st.caption(f"Enter {label}")
+                        if isinstance(v, (int, float)):
+                            payload[f] = st.number_input("", value=float(v), key=f"debt_{idx}_{f}")
+                        else:
+                            payload[f] = st.text_input("", value=v, key=f"debt_{idx}_{f}")
             preview = float(payload.get("monthly_payment", 0))
             st.caption(f"Monthly Payment: ${preview:,.2f}")
             c1, c2 = st.columns(2)
