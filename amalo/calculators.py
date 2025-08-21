@@ -88,6 +88,29 @@ def w2_totals(df: pd.DataFrame) -> pd.DataFrame:
         )
     out = df.copy()
 
+    num_cols = [
+        "AnnualSalary",
+        "HourlyRate",
+        "HoursPerWeek",
+        "OT_YTD",
+        "Bonus_YTD",
+        "Comm_YTD",
+        "Months_YTD",
+        "OT_LY",
+        "Bonus_LY",
+        "Comm_LY",
+        "Months_LY",
+    ]
+    for c in num_cols:
+        if c in out.columns:
+            out[c] = pd.to_numeric(out[c], errors="coerce").fillna(0.0).clip(lower=0)
+        else:
+            out[c] = 0.0
+    if "VarAvgMonths" in out.columns:
+        out["VarAvgMonths"] = pd.to_numeric(out["VarAvgMonths"], errors="coerce").fillna(12)
+    else:
+        out["VarAvgMonths"] = 12
+
     def base_monthly(r):
         t = str(r.get("PayType", "")).lower()
         if t == "salary":
@@ -98,12 +121,16 @@ def w2_totals(df: pd.DataFrame) -> pd.DataFrame:
 
     out["BaseMonthly"] = out.apply(base_monthly, axis=1)
     out["VarTotal"] = (
-        out[["OT_YTD", "Bonus_YTD", "Comm_YTD"]].fillna(0).sum(axis=1)
-        + out[["OT_LY", "Bonus_LY", "Comm_LY"]].fillna(0).sum(axis=1)
+        out[["OT_YTD", "Bonus_YTD", "Comm_YTD"]].sum(axis=1)
+        + out[["OT_LY", "Bonus_LY", "Comm_LY"]].sum(axis=1)
     )
-    out["VarMonths"] = (
-        out[["Months_YTD", "Months_LY"]].fillna(0).sum(axis=1).replace(0, pd.NA)
-    )
+    hist_months = out["Months_YTD"] + out["Months_LY"]
+    out["InsufficientHistory"] = hist_months < 12
+    out["VarMonths"] = hist_months
+    out.loc[out["VarAvgMonths"] == 24, "VarMonths"] = 24
+    out.loc[out["VarAvgMonths"] != 24, "VarMonths"] = out.loc[
+        out["VarAvgMonths"] != 24, "VarMonths"
+    ].replace(0, pd.NA)
     out["VariableMonthly"] = (out["VarTotal"] / out["VarMonths"]).fillna(0)
     out["YOY_Var_Annualized"] = (
         (
@@ -126,6 +153,7 @@ def w2_totals(df: pd.DataFrame) -> pd.DataFrame:
             VariableMonthly=("VariableMonthly", "sum"),
             QualMonthly=("QualMonthly_row", "sum"),
             W2_DecliningVarFlag=("DecliningVarFlag", "any"),
+            W2_InsufficientVarFlag=("InsufficientHistory", "any"),
         )
         .reset_index()
     )
@@ -292,6 +320,8 @@ def combine_income(
     out = mergecol(out, w2a, "W2_Monthly")
     if "W2_DecliningVarFlag" in w2a.columns:
         out = out.merge(w2a[["BorrowerID", "W2_DecliningVarFlag"]], on="BorrowerID", how="left")
+    if "W2_InsufficientVarFlag" in w2a.columns:
+        out = out.merge(w2a[["BorrowerID", "W2_InsufficientVarFlag"]], on="BorrowerID", how="left")
     out = mergecol(out, sca, "SchC_Monthly")
     if "SchC_DecliningFlag" in sca.columns:
         out = out.merge(sca[["BorrowerID", "SchC_DecliningFlag"]], on="BorrowerID", how="left")
