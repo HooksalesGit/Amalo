@@ -113,8 +113,12 @@ def main():
     )
     st.session_state.setdefault("ui_prefs", {"show_bottom_bar": False, "language": "en"})
 
-    view_mode, targets, program = render_topbar()
-    st.session_state["program_name"] = program
+    # Render the top bar and capture current program/target selections. The
+    # selectbox in ``render_topbar`` already manages ``program_name`` via
+    # Streamlit's ``session_state``. Attempting to assign to the same key again
+    # triggers a ``StreamlitAPIException`` in recent versions of Streamlit.
+    # Rely on the widget-managed value instead of overwriting it here.
+    view_mode, targets, _program = render_topbar()
     st.session_state["program_targets"] = targets
     if view_mode == "data_entry":
         cols = st.columns(3)
