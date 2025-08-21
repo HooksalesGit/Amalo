@@ -12,7 +12,9 @@ class RuleResult(BaseModel):
 
 def evaluate_rules(state: dict) -> List[RuleResult]:
     res: List[RuleResult] = []
+
     total_income = float(state.get("total_income", 0.0))
+
     FE = float(state.get("FE", 0.0)) * 100
     BE = float(state.get("BE", 0.0)) * 100
     target_FE = float(state.get("target_FE", 31.0))

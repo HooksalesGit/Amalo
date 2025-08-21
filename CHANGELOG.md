@@ -32,6 +32,10 @@ All notable changes to this project will be documented in this file.
 ## [2025-08-26]
 
 ### Fixed
+- Split semicolon-separated assignments in rules modules into separate lines to satisfy style checks.
+
+
+### Fixed
 - Removed unused variable in `default_gross_up_pct` to resolve linter warning.
 ### Changed
 - Reformatted codebase using `black`.
