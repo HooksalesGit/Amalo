@@ -213,7 +213,64 @@ DEBT_FIELDS = [
 
 def render_w2_form():
     st.caption(W2_GUIDELINES)
-    render_income_tab("w2_rows", W2_FIELDS, "W‑2 / Base Employment", model_cls=W2, show_header=False)
+    rows = st.session_state.get("w2_rows", [])
+    if st.button("Add W-2 Job", key="add_w2_job"):
+        rows.append(W2().model_dump())
+        st.session_state["w2_rows"] = rows
+        st.experimental_rerun()
+    for idx, row in enumerate(rows):
+        title = row.get("Employer") or f"Job {idx + 1}"
+        with st.expander(title, expanded=True):
+            form_key = f"w2_job_{idx}"
+            with st.form(form_key):
+                cols = st.columns(3)
+                for f_idx, (fname, ftype, options) in enumerate(W2_FIELDS):
+                    fkey = f"{form_key}_{fname}"
+                    target = cols[f_idx % 3]
+                    with target:
+                        if ftype == "text":
+                            val = text_input_with_help(fname, fkey, fname, value=row.get(fname, ""))
+                        elif ftype == "number":
+                            val = number_input_with_help(
+                                fname, fkey, fname, value=float(row.get(fname, 0) or 0), step=1.0
+                            )
+                        elif ftype == "select":
+                            current = row.get(fname, options[0] if options else "")
+                            try:
+                                index = options.index(current)
+                            except Exception:
+                                index = 0
+                            val = selectbox_with_help(fname, options, fkey, fname, index=index)
+                        elif ftype == "checkbox":
+                            val = checkbox_with_help(fname, fkey, fname)
+                        elif ftype == "borrower":
+                            current = int(row.get(fname, 1) or 1)
+                            val = borrower_select_with_help("Borrower", fkey, "BorrowerID", value=current)
+                        else:
+                            val = row.get(fname)
+                        row[fname] = val
+
+                preview = w2_totals(pd.DataFrame([row]))
+                if not preview.empty:
+                    bm = float(preview.loc[0, "BaseMonthly"])
+                    vm = float(preview.loc[0, "VariableMonthly"])
+                    qm = float(preview.loc[0, "QualMonthly"])
+                    st.caption(
+                        f"BaseMonthly: ${bm:,.2f} | VariableMonthly: ${vm:,.2f} | QualMonthly: ${qm:,.2f}"
+                    )
+
+                c1, c2 = st.columns(2)
+                save = c1.form_submit_button("Save")
+                remove = c2.form_submit_button("Remove", key=f"remove_{form_key}")
+
+            if save:
+                rows[idx] = row
+                st.session_state["w2_rows"] = rows
+                st.experimental_rerun()
+            if remove:
+                rows.pop(idx)
+                st.session_state["w2_rows"] = rows
+                st.experimental_rerun()
 
 
 def render_schedule_c_form():
