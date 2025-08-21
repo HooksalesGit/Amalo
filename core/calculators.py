@@ -1001,3 +1001,71 @@ def what_if_max_qualifying(
         "rate_plus_0.25": rate_up,
         "debt_plus_300": debt_up,
     }
+
+
+def compare_scenarios(
+    total_income,
+    other_debts,
+    taxes_ins_hoa_mi,
+    fe_target,
+    be_target,
+    rate_pct,
+    term_years,
+    down_payment_amt,
+    program,
+    conv_mi_tbl,
+    fha_tables,
+    va_tbl,
+    usda_tbl,
+    finance_upfront,
+    first_use_va,
+    fico_bucket,
+    alt_rate_pct=None,
+    alt_down_payment_amt=None,
+    alt_program=None,
+):
+    """Compare base scenario against an alternative with modified inputs.
+
+    Returns a dictionary with ``base`` and ``alt`` keys. Each value contains
+    the front-end and back-end DTI along with the maximum purchase price for
+    that scenario. ``alt_*`` parameters default to the base values when ``None``.
+    """
+
+    def scenario(rate, down, prog):
+        res = max_qualifying_loan(
+            total_income,
+            other_debts,
+            taxes_ins_hoa_mi,
+            fe_target,
+            be_target,
+            rate,
+            term_years,
+            down,
+            prog,
+            conv_mi_tbl,
+            fha_tables,
+            va_tbl,
+            usda_tbl,
+            finance_upfront,
+            first_use_va,
+            fico_bucket,
+        )
+        fe, be = dti(
+            res["max_pi"] + taxes_ins_hoa_mi,
+            res["max_pi"] + taxes_ins_hoa_mi + other_debts,
+            total_income,
+        )
+        return {
+            "fe_dti": fe,
+            "be_dti": be,
+            "max_purchase": res["purchase_price"],
+        }
+
+    base = scenario(rate_pct, down_payment_amt, program)
+    alt = scenario(
+        alt_rate_pct if alt_rate_pct is not None else rate_pct,
+        alt_down_payment_amt if alt_down_payment_amt is not None else down_payment_amt,
+        alt_program or program,
+    )
+
+    return {"base": base, "alt": alt}
