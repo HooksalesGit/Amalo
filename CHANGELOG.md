@@ -76,3 +76,8 @@ All notable changes to this project will be documented in this file.
 ### Added
 - What-if calculator provides quick toggles for down payment, rate, and monthly debt changes.
 - Reserve requirement and DSCR helpers support investment property analyses.
+
+## [0.1.1] - 2025-08-31
+### Fixed
+- Bottom bar view switches no longer raise a ``StreamlitAPIException`` by separating
+  widget and session state keys.

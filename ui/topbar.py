@@ -50,12 +50,23 @@ def render_topbar():
                 st.session_state["be_target"] = be
             tgt = {"fe_target": fe, "be_target": be}
         with right:
+            # ``st.radio`` will manage the value for its ``key`` inside
+            # ``st.session_state``.  Streamlit 1.30+ forbids assigning to that
+            # key again within the same script run.  Previously the bottom bar
+            # attempted to change ``view_mode`` directly which triggered a
+            # ``StreamlitAPIException``.  To allow programmatic updates, use a
+            # separate key for the widget and synchronize it with our own
+            # ``view_mode`` entry.
+            st.session_state.setdefault("view_mode", "data_entry")
+            st.session_state["view_mode_radio"] = st.session_state["view_mode"]
             view_mode = st.radio(
                 t("View", lang),
                 ["data_entry", "dashboard", "max_qualifiers"],
                 horizontal=True,
-                key="view_mode",
+                key="view_mode_radio",
             )
+            st.session_state["view_mode"] = view_mode
+
             st.session_state.setdefault("ui_prefs", {})
             st.session_state["ui_prefs"].setdefault("language", "en")
             st.session_state["ui_prefs"]["language"] = st.selectbox(
