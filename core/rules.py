@@ -24,6 +24,16 @@ def evaluate_rules(state: dict) -> List[RuleResult]:
                 message="Variable W‑2 income included with <12 months history.",
             )
         )
+    missing_var_months=int(w2_meta.get("var_missing_months",0))
+    if missing_var_months>0:
+        res.append(
+            RuleResult(
+                code="W2_VAR_MISSING_MONTHS",
+                severity="warn",
+                message="Variable income history has missing months.",
+                context={"missing_months":missing_var_months},
+            )
+        )
     if w2_meta.get("declining_var", False):
         res.append(
             RuleResult(
@@ -76,6 +86,35 @@ def evaluate_rules(state: dict) -> List[RuleResult]:
                 message="Rental income declining year‑over‑year.",
             )
         )
+    if float(state.get("rental_income",0)) < 0:
+        res.append(
+            RuleResult(
+                code="RENTAL_INCOME_NEGATIVE",
+                severity="warn",
+                message="Rental income is negative.",
+            )
+        )
+
+    income_hist = state.get("total_income_history")
+    if isinstance(income_hist, dict) and len(income_hist) >= 2:
+        items = sorted(income_hist.items(), key=lambda kv: int(kv[0]))
+        prev_year, prev_inc = items[-2]
+        curr_year, curr_inc = items[-1]
+        prev_inc = float(prev_inc); curr_inc = float(curr_inc)
+        if prev_inc > 0 and (prev_inc - curr_inc) / prev_inc > 0.20:
+            res.append(
+                RuleResult(
+                    code="TOTAL_INCOME_DECLINE",
+                    severity="warn",
+                    message="Total income declined more than 20% year‑over‑year.",
+                    context={
+                        "prior_year": prev_year,
+                        "prior_income": prev_inc,
+                        "current_year": curr_year,
+                        "current_income": curr_inc,
+                    },
+                )
+            )
 
     if state.get("uses_k1", False) and not (
         state.get("k1_verified_distributions", False)
@@ -127,12 +166,32 @@ def evaluate_rules(state: dict) -> List[RuleResult]:
             )
         )
 
-    if FE > target_FE or BE > target_BE:
+    if FE > target_FE:
         res.append(
             RuleResult(
-                code="DTI_OVER_TARGET",
+                code="HOUSING_RATIO_OVER_LIMIT",
                 severity="warn",
-                message="DTI exceeds target thresholds.",
+                message="Housing ratio exceeds agency/program limit.",
+                context={"actual": FE, "limit": target_FE},
+            )
+        )
+
+    if BE > target_BE:
+        res.append(
+            RuleResult(
+                code="TOTAL_DTI_OVER_LIMIT",
+                severity="warn",
+                message="Total DTI exceeds agency/program limit.",
+                context={"actual": BE, "limit": target_BE},
+            )
+        )
+
+    if BE > target_BE or state.get("is_investment_property", False):
+        res.append(
+            RuleResult(
+                code="CONSIDER_RESERVES",
+                severity="info",
+                message="Consider verifying reserves due to high DTI or investment property.",
             )
         )
 
