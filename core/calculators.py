@@ -1,6 +1,7 @@
 
 from __future__ import annotations
-import math, pandas as pd
+import math
+import pandas as pd
 
 
 def nz(x, default=0.0):
@@ -341,7 +342,6 @@ def default_gross_up_pct(income_type: str, program: str) -> float:
     """
 
     itype = (income_type or "").lower()
-    prog = (program or "").lower()
     if "social" in itype:
         return 25.0
     if "disability" in itype:

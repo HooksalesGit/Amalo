@@ -1,6 +1,7 @@
 
 from __future__ import annotations
-import math, pandas as pd
+import math
+import pandas as pd
 
 
 def nz(x, default=0.0):
