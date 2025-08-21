@@ -2,7 +2,6 @@ from streamlit.testing.v1 import AppTest
 
 
 def debts_app():
-    import streamlit as st
     from ui.cards_debts import render_debt_cards
 
     render_debt_cards()

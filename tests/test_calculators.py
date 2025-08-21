@@ -303,3 +303,59 @@ def test_filter_support_income():
     flt = filter_support_income(df, False)
     assert all(~flt["Type"].str.lower().str.contains("alimony|housing"))
     assert len(flt) == 1
+
+
+def test_monthly_payment_negative_term():
+    assert monthly_payment(100000, 6.5, -30) == 0.0
+
+
+def test_w2_totals_handles_large_income():
+    df = pd.DataFrame(
+        [
+            {
+                "BorrowerID": 1,
+                "PayType": "Salary",
+                "AnnualSalary": 1_000_000_000,
+                "IncludeVariable": 0,
+            }
+        ]
+    )
+    res = w2_totals(df)
+    bm = float(res.loc[0, "BaseMonthly"])
+    assert bm == 1_000_000_000 / 12
+
+
+def test_rentals_policy_negative_income():
+    df = pd.DataFrame(
+        [
+            {
+                "BorrowerID": 1,
+                "Property": "A",
+                "Year": 2024,
+                "Rents": 10000,
+                "Expenses": 20000,
+                "Depreciation": 0,
+            },
+        ]
+    )
+    agg = rentals_policy(df, method="ScheduleE")
+    assert float(agg.loc[0, "Rental_Monthly"]) < 0
+
+
+def test_piti_components_financed_fee_increase():
+    comps = apply_program_fees(
+        "FHA",
+        300000,
+        285000,
+        15000,
+        6.5,
+        30,
+        CONV_MI_BANDS,
+        FHA_TABLES,
+        VA_TABLE,
+        USDA_TABLE,
+        True,
+        True,
+        ">=740",
+    )
+    assert comps["adjusted_loan"] >= 285000

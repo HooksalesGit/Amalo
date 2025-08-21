@@ -53,4 +53,13 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - Reformatted codebase using `black`.
 
+## [2025-08-27]
+### Added
+- Version display in top bar and session autosave/restore.
+- Refactored `app.py` into modular UI components and state helpers.
+- Pydantic `Housing` model ensures numeric input validation.
+- API integration stubs for credit reports, valuation, and bank statements.
+- Additional tests covering negative terms, large income, rental losses, and financed fees.
+- CI pipeline now checks formatting with Black and lints with Ruff.
+
 
