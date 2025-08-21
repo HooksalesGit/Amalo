@@ -56,12 +56,12 @@ docstrings for quick reference in interactive environments.
 The project separates UI from business logic to enable parallel development:
 
 - `app.py` – Streamlit user interface and form rendering helpers.
-- `amalo/` – reusable Python package containing:
+- `core/` – reusable business logic:
   - `calculators.py` – income and qualification calculators.
   - `rules.py` – rule evaluation and warning helpers.
   - `presets.py` – program presets and constant tables.
-  - `pdf_export.py` – PDF export utilities.
   - `models.py` – Pydantic models describing form inputs.
+- `export/` – output helpers including a `pdf_export.py` stub.
 
 ## Development
 
@@ -72,6 +72,6 @@ pip install -r requirements.txt
 pytest -q
 ```
 
-New modules should live under the `amalo` package and include tests when
+New modules should live under the `core` package and include tests when
 appropriate. Use `render_income_tab` helpers in `app.py` for new form groups to
 maintain consistency.
