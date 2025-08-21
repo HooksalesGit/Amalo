@@ -341,14 +341,32 @@ def render_k1_form():
         "Analyzed business liquidity (if no distributions)",
         value=bool(st.session_state.k1_analyzed_liquidity),
     )
+    st.session_state.k1_justification = st.text_area(
+        "Underwriter justification",
+        value=st.session_state.k1_justification,
+    )
     render_income_tab("k1_rows", K1_FIELDS, "K‑1 Income", model_cls=K1, show_header=False)
 
 
 def render_corp1120_form():
     st.warning(
-        "Only include entities where the borrower owns 100%. Entries with <100% ownership are ignored."
+        "C‑Corp income counts only if ownership is 100%. Entries with lower ownership are ignored and inputs disabled."
     )
-    render_income_tab("c1120_rows", C1120_FIELDS, "C‑Corporation (1120)", model_cls=C1120, show_header=False)
+    def disabler(row, fname):
+        if fname == "OwnershipPct":
+            return False
+        try:
+            return float(row.get("OwnershipPct", 0) or 0) < 100
+        except Exception:
+            return True
+    render_income_tab(
+        "c1120_rows",
+        C1120_FIELDS,
+        "C‑Corporation (1120)",
+        model_cls=C1120,
+        show_header=False,
+        disable_fn=disabler,
+    )
 
 
 def render_rental_form():
@@ -384,7 +402,7 @@ def render_debt_form():
 # calculators for end users.
 # ---------------------------------------------------------------------------
 
-def text_input_with_help(label: str, key: str, help_key: str, value="", suggestions=None):
+def text_input_with_help(label: str, key: str, help_key: str, value="", suggestions=None, disabled: bool = False):
     """Text input with guidance rendered between the title and control."""
 
     disp = pretty_label(label)
@@ -395,10 +413,10 @@ def text_input_with_help(label: str, key: str, help_key: str, value="", suggesti
     link = FIELD_DOC_LINKS.get(help_key)
     if link:
         st.markdown(f"<a href='{link}' target='_blank'>📄</a>", unsafe_allow_html=True)
-    val = st.text_input("", value=value, key=key, label_visibility="collapsed")
+    val = st.text_input("", value=value, key=key, label_visibility="collapsed", disabled=disabled)
     if suggestions:
         pick = st.selectbox(
-            "", [""] + suggestions, key=f"{key}_suggest", label_visibility="collapsed"
+            "", [""] + suggestions, key=f"{key}_suggest", label_visibility="collapsed", disabled=disabled
         )
         if pick:
             val = pick
@@ -414,6 +432,7 @@ def number_input_with_help(
     step=1.0,
     min_value=None,
     format=None,
+    disabled: bool = False,
 ):
     disp = pretty_label(label)
     st.markdown(f"<span title='{disp}'><strong>{disp}</strong></span>", unsafe_allow_html=True)
@@ -431,10 +450,11 @@ def number_input_with_help(
         format=format,
         key=key,
         label_visibility="collapsed",
+        disabled=disabled,
     )
 
 
-def selectbox_with_help(label: str, options: list, key: str, help_key: str, index=0):
+def selectbox_with_help(label: str, options: list, key: str, help_key: str, index=0, disabled: bool = False):
     """Selectbox with guidance rendered between the title and control."""
 
     disp = pretty_label(label)
@@ -451,10 +471,11 @@ def selectbox_with_help(label: str, options: list, key: str, help_key: str, inde
         index=index,
         key=key,
         label_visibility="collapsed",
+        disabled=disabled,
     )
 
 
-def checkbox_with_help(label: str, key: str, help_key: str):
+def checkbox_with_help(label: str, key: str, help_key: str, disabled: bool = False):
     """Checkbox with guidance displayed between the title and control."""
 
     disp = pretty_label(label)
@@ -465,10 +486,10 @@ def checkbox_with_help(label: str, key: str, help_key: str):
     link = FIELD_DOC_LINKS.get(help_key)
     if link:
         st.markdown(f"<a href='{link}' target='_blank'>📄</a>", unsafe_allow_html=True)
-    return st.checkbox("", key=key, label_visibility="collapsed")
+    return st.checkbox("", key=key, label_visibility="collapsed", disabled=disabled)
 
 
-def borrower_select_with_help(label: str, key: str, help_key: str, value: int = 1):
+def borrower_select_with_help(label: str, key: str, help_key: str, value: int = 1, disabled: bool = False):
     """Dropdown for selecting borrower by name while storing numeric ID."""
 
     ids = list(st.session_state.borrower_names.keys())
@@ -491,10 +512,11 @@ def borrower_select_with_help(label: str, key: str, help_key: str, value: int = 
         key=key,
         format_func=lambda x: st.session_state.borrower_names.get(x, f"Borrower {x}"),
         label_visibility="collapsed",
+        disabled=disabled,
     )
 
 
-def render_income_tab(key_name, fields, title, model_cls=None, show_header: bool = True):
+def render_income_tab(key_name, fields, title, model_cls=None, show_header: bool = True, disable_fn=None):
     """Render a dynamic list of entries for a given income/debt type.
 
     Parameters
@@ -527,6 +549,7 @@ def render_income_tab(key_name, fields, title, model_cls=None, show_header: bool
                 fkey = f"{key_name}_{idx}_{fname}"
                 target = cols[f_idx % 2]
                 with target:
+                    disabled = disable_fn(row, fname) if disable_fn else False
                     if ftype == "text":
                         sugg = None
                         if fname == "Employer":
@@ -534,7 +557,7 @@ def render_income_tab(key_name, fields, title, model_cls=None, show_header: bool
                         elif fname == "BusinessName":
                             sugg = st.session_state.get("business_suggestions", [])
                         val = text_input_with_help(
-                            fname, fkey, fname, value=row.get(fname, ""), suggestions=sugg
+                            fname, fkey, fname, value=row.get(fname, ""), suggestions=sugg, disabled=disabled
                         )
                         if fname == "Employer" and val and val not in st.session_state.employer_suggestions:
                             st.session_state.employer_suggestions.append(val)
@@ -542,7 +565,7 @@ def render_income_tab(key_name, fields, title, model_cls=None, show_header: bool
                             st.session_state.business_suggestions.append(val)
                     elif ftype == "number":
                         val = number_input_with_help(
-                            fname, fkey, fname, value=float(row.get(fname, 0) or 0), step=1.0
+                            fname, fkey, fname, value=float(row.get(fname, 0) or 0), step=1.0, disabled=disabled
                         )
                     elif ftype == "select":
                         current = row.get(fname, options[0] if options else "")
@@ -550,12 +573,12 @@ def render_income_tab(key_name, fields, title, model_cls=None, show_header: bool
                             index = options.index(current)
                         except Exception:
                             index = 0
-                        val = selectbox_with_help(fname, options, fkey, fname, index=index)
+                        val = selectbox_with_help(fname, options, fkey, fname, index=index, disabled=disabled)
                     elif ftype == "checkbox":
-                        val = checkbox_with_help(fname, fkey, fname)
+                        val = checkbox_with_help(fname, fkey, fname, disabled=disabled)
                     elif ftype == "borrower":
                         current = int(row.get(fname, 1) or 1)
-                        val = borrower_select_with_help("Borrower", fkey, "BorrowerID", value=current)
+                        val = borrower_select_with_help("Borrower", fkey, "BorrowerID", value=current, disabled=disabled)
                     else:
                         val = row.get(fname)
                 row[fname] = val
@@ -605,6 +628,8 @@ def init_state():
     ss.setdefault("subject_market_rent", 0.0)
     ss.setdefault("k1_verified_distributions", False)
     ss.setdefault("k1_analyzed_liquidity", False)
+    ss.setdefault("k1_justification", "")
+    ss.setdefault("selfemp_year_mode", "average")
     ss.setdefault("support_continuance_ok", False)
     ss.setdefault("borrower_names", {1: "Borrower 1", 2: "Borrower 2"})
     ss.setdefault("employer_suggestions", [])
@@ -668,14 +693,18 @@ def compute_results():
         subject_pitia=fees["total"],
         subject_market_rent=st.session_state.subject_market_rent,
     )
+    recent_selfemp = st.session_state.selfemp_year_mode != "average"
+    k1_allowed = st.session_state.k1_verified_distributions or st.session_state.k1_analyzed_liquidity
+    k1_input = k1_df if (not k1_df.empty and k1_allowed) else None
     incomes = combine_income(
         st.session_state.num_borrowers,
         w2_df,
         schc_df,
-        k1_df,
+        k1_input,
         c1120_df,
         rentals_df,
         other_df,
+        recent_selfemp=recent_selfemp,
     )
     total_income = incomes["TotalMonthlyIncome"].sum() if not incomes.empty else 0.0
     other_debts = 0.0 if debt_df.empty else pd.to_numeric(debt_df["MonthlyPayment"], errors="coerce").fillna(0.0).sum()
@@ -686,8 +715,12 @@ def compute_results():
         included = pd.to_numeric(w2_df['IncludeVariable'], errors='coerce').fillna(0) == 1
         if any((months < 12) & included):
             w2_included_lt_12 = True
-    w2_declining_flag = bool(incomes.get('AnyDecliningFlag', pd.Series([False])).any())
+    w2_var_declining = bool(incomes.get('W2_DecliningVarFlag', pd.Series([False])).any())
+    w2_base_declining = bool(incomes.get('W2_DecliningBaseFlag', pd.Series([False])).any())
     schc_declining = bool(incomes.get('SchC_DecliningFlag', pd.Series([False])).any())
+    k1_declining = bool(incomes.get('K1_DecliningFlag', pd.Series([False])).any())
+    c1120_declining = bool(incomes.get('C1120_DecliningFlag', pd.Series([False])).any())
+    rental_declining = bool(incomes.get('Rental_DecliningFlag', pd.Series([False])).any())
     uses_k1 = not k1_df.empty
     uses_c1120 = not c1120_df.empty
     c1120_any_lt_100 = False
@@ -707,8 +740,11 @@ def compute_results():
         "BE": BE,
         "target_FE": st.session_state.targets['FE'],
         "target_BE": st.session_state.targets['BE'],
-        "w2_meta": {"var_included_lt_12": w2_included_lt_12, "declining_var": w2_declining_flag},
+        "w2_meta": {"var_included_lt_12": w2_included_lt_12, "declining_var": w2_var_declining, "declining_base": w2_base_declining},
         "schc_declining": schc_declining,
+        "k1_declining": k1_declining,
+        "c1120_declining": c1120_declining,
+        "rental_declining": rental_declining,
         "uses_k1": uses_k1,
         "k1_verified_distributions": st.session_state.k1_verified_distributions,
         "k1_analyzed_liquidity": st.session_state.k1_analyzed_liquidity,
@@ -936,9 +972,15 @@ def render_borrower_setup():
 
 def render_income_section():
     st.header("Income")
+    st.session_state.selfemp_year_mode = st.radio(
+        "Self-employed income calculation",
+        ["Average two years", "Most recent year only"],
+        horizontal=True,
+        index=0 if st.session_state.selfemp_year_mode == "average" else 1,
+    )
     with st.expander("W‑2 / Base Employment"):
         render_w2_form()
-    with st.expander("Self‑Employed — Schedule C (two‑year analysis)"):
+    with st.expander("Self‑Employed — Schedule C"):
         render_schedule_c_form()
     with st.expander("K‑1 Income"):
         render_k1_form()
@@ -1120,11 +1162,14 @@ def render_exports():
         c3.info("Resolve critical warnings or add an override reason to enable PDF export.")
     st.subheader("Max Purchase / Max Loan Solver")
     try:
+        k1_rows = pd.DataFrame(st.session_state.k1_rows)
+        k1_allowed = st.session_state.k1_verified_distributions or st.session_state.k1_analyzed_liquidity
+        k1_input = k1_rows if (not k1_rows.empty and k1_allowed) else None
         incomes = combine_income(
             st.session_state.num_borrowers,
             pd.DataFrame(st.session_state.w2_rows),
             pd.DataFrame(st.session_state.schc_rows),
-            pd.DataFrame(st.session_state.k1_rows),
+            k1_input,
             pd.DataFrame(st.session_state.c1120_rows),
             rentals_policy(
                 pd.DataFrame(st.session_state.rental_rows),
@@ -1132,6 +1177,7 @@ def render_exports():
                 st.session_state.subject_market_rent,
             ),
             pd.DataFrame(st.session_state.other_rows),
+            recent_selfemp=st.session_state.selfemp_year_mode != "average",
         )
         total_income = incomes['TotalMonthlyIncome'].sum()
     except Exception:
