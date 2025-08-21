@@ -464,15 +464,23 @@ def compute_ltv(purchase_price, base_loan):
 def conventional_mi_factor(ltv, fico_bucket, mi_table):
     """Look up private MI factor based on LTV and credit score bucket."""
 
+    bucket_tbl = {}
+    if isinstance(mi_table, dict):
+        bucket_tbl = mi_table.get(fico_bucket) or mi_table.get("default")
+        if bucket_tbl is None and mi_table:
+            # fall back to first entry
+            bucket_tbl = next(iter(mi_table.values()))
+    bucket_tbl = bucket_tbl or {}
+
     if ltv >= 97:
-        return mi_table.get(">=97", 0.90)
+        return bucket_tbl.get(">=97", 0.90)
     if 95 <= ltv < 97:
-        return mi_table.get("95-97", 0.62)
+        return bucket_tbl.get("95-97", 0.62)
     if 90 <= ltv < 95:
-        return mi_table.get("90-95", 0.40)
+        return bucket_tbl.get("90-95", 0.40)
     if 85 <= ltv < 90:
-        return mi_table.get("85-90", 0.25)
-    return mi_table.get("<85", 0.0)
+        return bucket_tbl.get("85-90", 0.25)
+    return bucket_tbl.get("<85", 0.0)
 
 
 def fha_mip_factor(ltv, term_years, table):
