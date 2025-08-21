@@ -14,8 +14,20 @@ def build_prequal_pdf(out_path: str, branding: dict, summary: dict, incomes_tabl
     story = []
     title = branding.get("title","Prequalification Summary")
     story += [Paragraph(f"<b>{title}</b>", styles['Title']), Spacer(1,6)]
-    if branding.get("mlo"): story.append(Paragraph(f"MLO: {branding['mlo']}  |  NMLS: {branding.get('nmls','')}", styles['Normal']))
-    if branding.get("contact"): story.append(Paragraph(f"Contact: {branding['contact']}", styles['Normal']))
+    if branding.get("mlo"):
+        story.append(
+            Paragraph(
+                f"MLO: {branding['mlo']}  |  NMLS: {branding.get('nmls','')}",
+                styles['Normal'],
+            )
+        )
+    if branding.get("contact"):
+        story.append(
+            Paragraph(
+                f"Contact: {branding['contact']}",
+                styles['Normal'],
+            )
+        )
     story += [Spacer(1, 12)]
     ds = summary.get("deal_snapshot", {})
     deal_rows = [[k, f"{v}"] for k,v in ds.items()]
