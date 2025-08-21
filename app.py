@@ -302,7 +302,7 @@ def render_w2_form():
 
                 c1, c2 = st.columns(2)
                 save = c1.form_submit_button("Save")
-                remove = c2.form_submit_button("Remove", key=f"remove_{form_key}")
+                remove = c2.form_submit_button("Remove")
 
             if save:
                 rows[idx] = row

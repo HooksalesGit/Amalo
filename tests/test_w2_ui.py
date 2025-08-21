@@ -1,4 +1,5 @@
 from streamlit.testing.v1 import AppTest
+from core.models import W2
 
 
 def w2_form_app():
@@ -11,5 +12,12 @@ def w2_form_app():
 
 def test_w2_ui_smoke():
     at = AppTest.from_function(w2_form_app)
+    at.run()
+    assert at.button("add_w2_job") is not None
+
+
+def test_w2_ui_with_row():
+    at = AppTest.from_function(w2_form_app)
+    at.session_state["w2_rows"] = [W2().model_dump()]
     at.run()
     assert at.button("add_w2_job") is not None
