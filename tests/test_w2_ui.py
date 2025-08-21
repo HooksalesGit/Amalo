@@ -5,6 +5,7 @@ from core.models import W2
 def w2_form_app():
     import streamlit as st
     import app
+
     if "w2_rows" not in st.session_state:
         st.session_state["w2_rows"] = []
     app.render_w2_form()

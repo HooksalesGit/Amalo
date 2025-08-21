@@ -14,7 +14,9 @@ def render_max_qualifiers_view():
     term = st.number_input("Term (years)", value=30.0, key="mq_term")
     down = st.number_input("Down Payment", value=0.0, key="mq_down")
     program = st.session_state.get("program_name", "Conventional")
-    targets = st.session_state.get("program_targets", {"fe_target": 0.0, "be_target": 0.0})
+    targets = st.session_state.get(
+        "program_targets", {"fe_target": 0.0, "be_target": 0.0}
+    )
     res = max_qualifying_loan(
         tot_inc,
         other_debts,
