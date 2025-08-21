@@ -13,6 +13,7 @@ from ui.topbar import render_topbar
 from ui.cards_income import render_income_cards
 from ui.cards_debts import render_debt_cards
 from ui.bottombar import render_bottombar
+from ui.documents import render_document_checklist
 
 
 # ---------------------------------------------------------------------------
@@ -232,6 +233,7 @@ def main():
             debt_total = render_debt_cards()
         with cols[2]:
             housing = render_property_column()
+            render_document_checklist()
         fe, be = dti(housing["total"], housing["total"] + debt_total, income_total)
         summary = {
             "total_income": income_total,

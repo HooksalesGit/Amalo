@@ -17,3 +17,7 @@ All notable changes to this project will be documented in this file.
 ## [2025-08-23]
 ### Added
 - Expanded rules engine to flag missing variable income months, total income declines, negative rental income, DTI limit breaches, and reserve prompts.
+
+## [2025-08-24]
+### Added
+- Document checklist builder with checkboxes and PDF export support.
