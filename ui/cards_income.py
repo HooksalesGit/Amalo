@@ -45,11 +45,25 @@ def render_income_cards() -> float:
                 card["type"] = sel
                 card["payload"] = _default_payload(sel)
             payload = card["payload"]
-            for f, v in payload.items():
-                if isinstance(v, (int, float)):
-                    payload[f] = st.number_input(f, value=float(v), key=f"inc_{idx}_{f}")
-                else:
-                    payload[f] = st.text_input(f, value=v, key=f"inc_{idx}_{f}")
+            model_cls = INCOME_MODELS[card["type"]][1]
+            items = list(payload.items())
+            for i in range(0, len(items), 2):
+                cols = st.columns(2)
+                for col_idx, (f, v) in enumerate(items[i : i + 2]):
+                    with cols[col_idx]:
+                        st.markdown(f"**{f}**")
+                        desc = ""
+                        try:
+                            desc = model_cls.model_fields[f].description or ""
+                        except Exception:
+                            pass
+                        if not desc:
+                            desc = f"Enter {f.replace('_', ' ')}"
+                        st.caption(desc)
+                        if isinstance(v, (int, float)):
+                            payload[f] = st.number_input("", value=float(v), key=f"inc_{idx}_{f}")
+                        else:
+                            payload[f] = st.text_input("", value=v, key=f"inc_{idx}_{f}")
             preview = _monthly_preview(card)
             st.caption(f"Monthly Qualifying: ${preview:,.2f}")
             c1, c2 = st.columns(2)
