@@ -5,3 +5,5 @@
 - Keep changes focused and grouped into logical commits.
 - Use `render_income_tab` for new Streamlit form groups.
 - Default branch is `main`; avoid creating new branches.
+- When implementing new features, verify that existing functionality remains unaffected and add or update tests accordingly.
+- Record each change in `CHANGELOG.md` with a brief summary.
