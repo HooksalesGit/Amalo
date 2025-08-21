@@ -4,6 +4,7 @@ from streamlit.testing.v1 import AppTest
 
 def sidebar_app():
     import app
+
     app.render_fee_sidebar()
     app.render_property_column()
 
