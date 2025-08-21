@@ -63,3 +63,7 @@ All notable changes to this project will be documented in this file.
 - CI pipeline now checks formatting with Black and lints with Ruff.
 
 
+
+## [2025-08-28]
+### Fixed
+- Avoid persisting Streamlit widget keys so buttons like "Add Income Card" no longer crash on startup.
