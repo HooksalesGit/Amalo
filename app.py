@@ -20,6 +20,7 @@ from ui.documents import render_document_checklist
 # Minimal W-2 form kept for test coverage
 # ---------------------------------------------------------------------------
 
+
 def render_w2_form():
     st.session_state.setdefault("w2_rows", [])
     if st.button("Add W2 Job", key="add_w2_job"):
@@ -96,14 +97,21 @@ def render_fee_sidebar():
 # Property / housing helpers
 # ---------------------------------------------------------------------------
 
+
 def render_property_column():
     st.session_state.setdefault("housing", {})
     h = st.session_state.housing
     with st.expander("Payment & Housing"):
-        h["purchase_price"] = st.number_input("Purchase Price", value=float(h.get("purchase_price", 0.0)))
-        h["down_payment_amt"] = st.number_input("Down Payment", value=float(h.get("down_payment_amt", 0.0)))
+        h["purchase_price"] = st.number_input(
+            "Purchase Price", value=float(h.get("purchase_price", 0.0))
+        )
+        h["down_payment_amt"] = st.number_input(
+            "Down Payment", value=float(h.get("down_payment_amt", 0.0))
+        )
         h["rate_pct"] = st.number_input("Rate %", value=float(h.get("rate_pct", 0.0)))
-        h["term_years"] = st.number_input("Term (years)", value=float(h.get("term_years", 30)))
+        h["term_years"] = st.number_input(
+            "Term (years)", value=float(h.get("term_years", 30))
+        )
         base_loan = h.get("purchase_price", 0.0) - h.get("down_payment_amt", 0.0)
         pi_only = monthly_payment(
             base_loan,
@@ -134,7 +142,9 @@ def render_property_column():
             value=float(h.get("hoa_monthly", 0.0)),
             help="Florida HOA averages ~$250/mo",
         )
-        h["finance_upfront"] = st.checkbox("Finance Upfront Fees", value=bool(h.get("finance_upfront", True)))
+        h["finance_upfront"] = st.checkbox(
+            "Finance Upfront Fees", value=bool(h.get("finance_upfront", True))
+        )
         h["credit_score"] = st.number_input(
             "Credit Score", value=float(h.get("credit_score", 760))
         )
@@ -176,6 +186,7 @@ def render_property_column():
 # Dashboard view
 # ---------------------------------------------------------------------------
 
+
 def render_dashboard_view(summary):
     st.header("Dashboard")
     cols = st.columns(4)
@@ -205,6 +216,7 @@ def render_dashboard_view(summary):
 # Main entry point
 # ---------------------------------------------------------------------------
 
+
 def main():
     st.set_page_config(layout="wide")
     st.session_state.setdefault("view_mode", "data_entry")
@@ -215,7 +227,9 @@ def main():
             "be_target": PROGRAM_PRESETS["Conventional"]["BE"],
         },
     )
-    st.session_state.setdefault("ui_prefs", {"show_bottom_bar": False, "language": "en"})
+    st.session_state.setdefault(
+        "ui_prefs", {"show_bottom_bar": False, "language": "en"}
+    )
     render_fee_sidebar()
 
     # Render the top bar and capture current program/target selections. The
@@ -243,11 +257,15 @@ def main():
             "fe_target": targets["fe_target"],
             "be_target": targets["be_target"],
         }
-        render_bottombar(summary, st.session_state["ui_prefs"].get("show_bottom_bar", False))
+        render_bottombar(
+            summary, st.session_state["ui_prefs"].get("show_bottom_bar", False)
+        )
     elif view_mode == "dashboard":
         housing = st.session_state.get("housing_calc", {"total": 0})
         income_total = sum(
-            card.get("payload", {}).get("QualMonthly", card.get("payload", {}).get("GrossMonthly", 0))
+            card.get("payload", {}).get(
+                "QualMonthly", card.get("payload", {}).get("GrossMonthly", 0)
+            )
             or 0
             for card in st.session_state.get("income_cards", [])
         )
@@ -256,7 +274,9 @@ def main():
             for card in st.session_state.get("debt_cards", [])
             if not card.get("payload", {}).get("payoff_at_close", False)
         )
-        fe, be = dti(housing.get("total", 0), housing.get("total", 0) + debt_total, income_total)
+        fe, be = dti(
+            housing.get("total", 0), housing.get("total", 0) + debt_total, income_total
+        )
         summary = {
             "total_income": income_total,
             "pitia": housing.get("total", 0),
@@ -276,7 +296,9 @@ def main():
         key="show_bottom_bar",
         value=st.session_state["ui_prefs"].get("show_bottom_bar", False),
     )
-    st.session_state["ui_prefs"]["show_bottom_bar"] = st.session_state["show_bottom_bar"]
+    st.session_state["ui_prefs"]["show_bottom_bar"] = st.session_state[
+        "show_bottom_bar"
+    ]
 
     st.markdown(
         """
