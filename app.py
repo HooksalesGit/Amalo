@@ -6,7 +6,7 @@ from core.presets import (
     VA_TABLE,
     USDA_TABLE,
 )
-from core.calculators import piti_components, dti
+from core.calculators import piti_components, dti, monthly_payment
 from core.models import W2
 from ui.topbar import render_topbar
 from ui.cards_income import render_income_cards
@@ -40,6 +40,13 @@ def render_property_column():
         h["down_payment_amt"] = st.number_input("Down Payment", value=float(h.get("down_payment_amt", 0.0)))
         h["rate_pct"] = st.number_input("Rate %", value=float(h.get("rate_pct", 0.0)))
         h["term_years"] = st.number_input("Term (years)", value=float(h.get("term_years", 30)))
+        base_loan = h.get("purchase_price", 0.0) - h.get("down_payment_amt", 0.0)
+        pi_only = monthly_payment(
+            base_loan,
+            h.get("rate_pct", 0.0),
+            h.get("term_years", 30),
+        )
+        st.caption(f"Monthly P&I: ${pi_only:,.2f}")
         h["tax_rate_pct"] = st.number_input("Tax Rate %", value=float(h.get("tax_rate_pct", 0.0)))
         h["hoi_annual"] = st.number_input("HOI Annual", value=float(h.get("hoi_annual", 0.0)))
         h["hoa_monthly"] = st.number_input("HOA Monthly", value=float(h.get("hoa_monthly", 0.0)))
