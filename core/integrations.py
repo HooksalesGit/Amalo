@@ -14,4 +14,3 @@ def fetch_property_valuation(address: str) -> float:
 def analyze_bank_statements(statements: list) -> dict:
     """Stub for bank statement analysis."""
     raise NotImplementedError("Bank statement analysis not implemented")
-

@@ -35,7 +35,9 @@ def main():
             "be_target": PROGRAM_PRESETS["Conventional"]["BE"],
         },
     )
-    st.session_state.setdefault("ui_prefs", {"show_bottom_bar": False, "language": "en"})
+    st.session_state.setdefault(
+        "ui_prefs", {"show_bottom_bar": False, "language": "en"}
+    )
     render_fee_sidebar()
 
     view_mode, targets, _program = render_topbar()
@@ -58,11 +60,15 @@ def main():
             "fe_target": targets["fe_target"],
             "be_target": targets["be_target"],
         }
-        render_bottombar(summary, st.session_state["ui_prefs"].get("show_bottom_bar", False))
+        render_bottombar(
+            summary, st.session_state["ui_prefs"].get("show_bottom_bar", False)
+        )
     elif view_mode == "dashboard":
         housing = st.session_state.get("housing_calc", {"total": 0})
         income_total = sum(
-            card.get("payload", {}).get("QualMonthly", card.get("payload", {}).get("GrossMonthly", 0))
+            card.get("payload", {}).get(
+                "QualMonthly", card.get("payload", {}).get("GrossMonthly", 0)
+            )
             or 0
             for card in st.session_state.get("income_cards", [])
         )
@@ -71,7 +77,9 @@ def main():
             for card in st.session_state.get("debt_cards", [])
             if not card.get("payload", {}).get("payoff_at_close", False)
         )
-        fe, be = dti(housing.get("total", 0), housing.get("total", 0) + debt_total, income_total)
+        fe, be = dti(
+            housing.get("total", 0), housing.get("total", 0) + debt_total, income_total
+        )
         summary = {
             "total_income": income_total,
             "pitia": housing.get("total", 0),
@@ -89,7 +97,9 @@ def main():
         key="show_bottom_bar",
         value=st.session_state["ui_prefs"].get("show_bottom_bar", False),
     )
-    st.session_state["ui_prefs"]["show_bottom_bar"] = st.session_state["show_bottom_bar"]
+    st.session_state["ui_prefs"]["show_bottom_bar"] = st.session_state[
+        "show_bottom_bar"
+    ]
 
     st.markdown(
         """
@@ -113,4 +123,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

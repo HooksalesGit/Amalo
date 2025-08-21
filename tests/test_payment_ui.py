@@ -4,6 +4,7 @@ from core.calculators import monthly_payment
 
 def housing_app():
     import app
+
     app.render_property_column()
 
 

@@ -1,5 +1,6 @@
 """Assorted utility helpers."""
 
+
 def fico_to_bucket(score):
     """Map a numeric credit score to the preset FICO buckets."""
     try:

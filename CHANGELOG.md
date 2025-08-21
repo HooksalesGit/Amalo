@@ -37,3 +37,8 @@ All notable changes to this project will be documented in this file.
 - CI now runs ruff, black and pytest.
 ### Changed
 - `dti` clips negative incomes to zero and additional test coverage was added.
+
+## [2025-08-27]
+### Fixed
+- Resolved ruff lint errors by splitting imports, removing unused variables and expanding single-line conditionals.
+- Applied `black` formatting across the codebase.
