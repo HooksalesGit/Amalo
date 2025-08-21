@@ -21,11 +21,27 @@ def render_topbar():
         with left:
             st.markdown("**AMALO**")
         with center:
-            program = st.selectbox(t("Program", lang), list(PROGRAM_PRESETS.keys()), key="program_name")
-            tgt = st.session_state.get("program_targets", {"fe_target": PROGRAM_PRESETS[program]["FE"], "be_target": PROGRAM_PRESETS[program]["BE"]})
-            c1, c2, c3 = st.columns([1,1,1])
-            fe = c1.number_input("FE Target", value=float(tgt.get("fe_target", PROGRAM_PRESETS[program]["FE"])), key="fe_target")
-            be = c2.number_input("BE Target", value=float(tgt.get("be_target", PROGRAM_PRESETS[program]["BE"])), key="be_target")
+            program = st.selectbox(
+                t("Program", lang), list(PROGRAM_PRESETS.keys()), key="program_name"
+            )
+            tgt = st.session_state.get(
+                "program_targets",
+                {
+                    "fe_target": PROGRAM_PRESETS[program]["FE"],
+                    "be_target": PROGRAM_PRESETS[program]["BE"],
+                },
+            )
+            c1, c2, c3 = st.columns([1, 1, 1])
+            fe = c1.number_input(
+                "FE Target",
+                value=float(tgt.get("fe_target", PROGRAM_PRESETS[program]["FE"])),
+                key="fe_target",
+            )
+            be = c2.number_input(
+                "BE Target",
+                value=float(tgt.get("be_target", PROGRAM_PRESETS[program]["BE"])),
+                key="be_target",
+            )
             if c3.button("Apply Presets"):
                 fe = PROGRAM_PRESETS[program]["FE"]
                 be = PROGRAM_PRESETS[program]["BE"]
@@ -33,10 +49,22 @@ def render_topbar():
                 st.session_state["be_target"] = be
             tgt = {"fe_target": fe, "be_target": be}
         with right:
-            view_mode = st.radio(t("View", lang), ["data_entry", "dashboard", "max_qualifiers"], horizontal=True, key="view_mode")
+            view_mode = st.radio(
+                t("View", lang),
+                ["data_entry", "dashboard", "max_qualifiers"],
+                horizontal=True,
+                key="view_mode",
+            )
             st.session_state.setdefault("ui_prefs", {})
             st.session_state["ui_prefs"].setdefault("language", "en")
-            st.session_state["ui_prefs"]["language"] = st.selectbox(t("Lang", lang), ["en", "es"], key="ui_lang", index=["en","es"].index(st.session_state["ui_prefs"].get("language","en")))
+            st.session_state["ui_prefs"]["language"] = st.selectbox(
+                t("Lang", lang),
+                ["en", "es"],
+                key="ui_lang",
+                index=["en", "es"].index(
+                    st.session_state["ui_prefs"].get("language", "en")
+                ),
+            )
         st.markdown("</div>", unsafe_allow_html=True)
     st.session_state["program_targets"] = tgt
     return view_mode, tgt, program

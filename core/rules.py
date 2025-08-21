@@ -1,21 +1,24 @@
-
 from __future__ import annotations
 from typing import Literal, List, Dict, Any
 from pydantic import BaseModel, Field
 
+
 class RuleResult(BaseModel):
     code: str
-    severity: Literal["info","warn","critical"]
+    severity: Literal["info", "warn", "critical"]
     message: str
     context: Dict[str, Any] = Field(default_factory=dict)
 
+
 def evaluate_rules(state: dict) -> List[RuleResult]:
     res: List[RuleResult] = []
-    total_income=float(state.get("total_income",0.0))
-    FE=float(state.get("FE",0.0))*100; BE=float(state.get("BE",0.0))*100
-    target_FE=float(state.get("target_FE",31.0)); target_BE=float(state.get("target_BE",45.0))
+    total_income = float(state.get("total_income", 0.0))
+    FE = float(state.get("FE", 0.0)) * 100
+    BE = float(state.get("BE", 0.0)) * 100
+    target_FE = float(state.get("target_FE", 31.0))
+    target_BE = float(state.get("target_BE", 45.0))
 
-    w2_meta=state.get("w2_meta",{})
+    w2_meta = state.get("w2_meta", {})
     if w2_meta.get("var_included_lt_12", False):
         res.append(
             RuleResult(
@@ -24,14 +27,14 @@ def evaluate_rules(state: dict) -> List[RuleResult]:
                 message="Variable W‑2 income included with <12 months history.",
             )
         )
-    missing_var_months=int(w2_meta.get("var_missing_months",0))
-    if missing_var_months>0:
+    missing_var_months = int(w2_meta.get("var_missing_months", 0))
+    if missing_var_months > 0:
         res.append(
             RuleResult(
                 code="W2_VAR_MISSING_MONTHS",
                 severity="warn",
                 message="Variable income history has missing months.",
-                context={"missing_months":missing_var_months},
+                context={"missing_months": missing_var_months},
             )
         )
     if w2_meta.get("declining_var", False):
@@ -86,7 +89,7 @@ def evaluate_rules(state: dict) -> List[RuleResult]:
                 message="Rental income declining year‑over‑year.",
             )
         )
-    if float(state.get("rental_income",0)) < 0:
+    if float(state.get("rental_income", 0)) < 0:
         res.append(
             RuleResult(
                 code="RENTAL_INCOME_NEGATIVE",
@@ -100,7 +103,8 @@ def evaluate_rules(state: dict) -> List[RuleResult]:
         items = sorted(income_hist.items(), key=lambda kv: int(kv[0]))
         prev_year, prev_inc = items[-2]
         curr_year, curr_inc = items[-1]
-        prev_inc = float(prev_inc); curr_inc = float(curr_inc)
+        prev_inc = float(prev_inc)
+        curr_inc = float(curr_inc)
         if prev_inc > 0 and (prev_inc - curr_inc) / prev_inc > 0.20:
             res.append(
                 RuleResult(
@@ -206,5 +210,6 @@ def evaluate_rules(state: dict) -> List[RuleResult]:
 
     return res
 
+
 def has_blocking(res: List[RuleResult]) -> bool:
-    return any(r.severity=="critical" for r in res)
+    return any(r.severity == "critical" for r in res)

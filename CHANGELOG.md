@@ -28,3 +28,7 @@ All notable changes to this project will be documented in this file.
 - Expanded disclaimer clarifies calculations are estimates and stresses AUS results, lender overlays, and income stability.
 - Simple audit log utility records user changes with timestamps.
 - Basic Spanish translations loaded from a JSON file with UI toggle support.
+
+## [2025-08-26]
+### Changed
+- Reformatted codebase using `black`.

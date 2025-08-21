@@ -79,7 +79,16 @@ def test_apply_program_fees_financed_ltv():
 
 def test_rentals_policy_schedule_e():
     df = pd.DataFrame(
-        [{"BorrowerID": 1, "Property": "A", "Year": 2024, "Rents": 24000, "Expenses": 12000, "Depreciation": 3000}]
+        [
+            {
+                "BorrowerID": 1,
+                "Property": "A",
+                "Year": 2024,
+                "Rents": 24000,
+                "Expenses": 12000,
+                "Depreciation": 3000,
+            }
+        ]
     )
     agg = rentals_policy(df, method="ScheduleE")
     expected = (24000 - 12000 + 3000) / 12
@@ -176,8 +185,20 @@ def test_w2_totals_clips_negatives_and_warns():
 def test_w2_base_decline_flag():
     df = pd.DataFrame(
         [
-            {"BorrowerID": 1, "PayType": "Salary", "AnnualSalary": 40000, "Base_LY": 60000, "IncludeVariable": 0},
-            {"BorrowerID": 2, "PayType": "Salary", "AnnualSalary": 50000, "Base_LY": 50000, "IncludeVariable": 0},
+            {
+                "BorrowerID": 1,
+                "PayType": "Salary",
+                "AnnualSalary": 40000,
+                "Base_LY": 60000,
+                "IncludeVariable": 0,
+            },
+            {
+                "BorrowerID": 2,
+                "PayType": "Salary",
+                "AnnualSalary": 50000,
+                "Base_LY": 50000,
+                "IncludeVariable": 0,
+            },
         ]
     )
     res = w2_totals(df)
@@ -195,7 +216,9 @@ def test_sch_c_recent_only_toggle():
     )
     avg = sch_c_totals(df)
     recent = sch_c_totals(df, recent_only=True)
-    assert round(float(avg.loc[0, "SchC_Monthly"]), 2) == round((100000 + 50000) / 2 / 12, 2)
+    assert round(float(avg.loc[0, "SchC_Monthly"]), 2) == round(
+        (100000 + 50000) / 2 / 12, 2
+    )
     assert round(float(recent.loc[0, "SchC_Monthly"]), 2) == round(50000 / 12, 2)
 
 
@@ -213,8 +236,22 @@ def test_k1_declining_flag():
 def test_rental_declining_flag():
     df = pd.DataFrame(
         [
-            {"BorrowerID": 1, "Property": "A", "Year": 2023, "Rents": 24000, "Expenses": 12000, "Depreciation": 3000},
-            {"BorrowerID": 1, "Property": "A", "Year": 2024, "Rents": 18000, "Expenses": 12000, "Depreciation": 3000},
+            {
+                "BorrowerID": 1,
+                "Property": "A",
+                "Year": 2023,
+                "Rents": 24000,
+                "Expenses": 12000,
+                "Depreciation": 3000,
+            },
+            {
+                "BorrowerID": 1,
+                "Property": "A",
+                "Year": 2024,
+                "Rents": 18000,
+                "Expenses": 12000,
+                "Depreciation": 3000,
+            },
         ]
     )
     res = rentals_policy(df, method="ScheduleE")
@@ -223,7 +260,16 @@ def test_rental_declining_flag():
 
 def test_rentals_policy_75pct_subject_pitia():
     df = pd.DataFrame(
-        [{"BorrowerID": 1, "Property": "A", "Year": 2024, "Rents": 12000, "Expenses": 0, "Depreciation": 0}]
+        [
+            {
+                "BorrowerID": 1,
+                "Property": "A",
+                "Year": 2024,
+                "Rents": 12000,
+                "Expenses": 0,
+                "Depreciation": 0,
+            }
+        ]
     )
     agg = rentals_policy(
         df,
@@ -245,11 +291,15 @@ def test_filter_support_income():
     df = pd.DataFrame(
         [
             {"BorrowerID": 1, "Type": "Alimony", "GrossMonthly": 1000, "GrossUpPct": 0},
-            {"BorrowerID": 1, "Type": "Housing Allowance", "GrossMonthly": 500, "GrossUpPct": 0},
+            {
+                "BorrowerID": 1,
+                "Type": "Housing Allowance",
+                "GrossMonthly": 500,
+                "GrossUpPct": 0,
+            },
             {"BorrowerID": 1, "Type": "Bonus", "GrossMonthly": 300, "GrossUpPct": 0},
         ]
     )
     flt = filter_support_income(df, False)
     assert all(~flt["Type"].str.lower().str.contains("alimony|housing"))
     assert len(flt) == 1
-
