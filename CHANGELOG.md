@@ -67,3 +67,7 @@ All notable changes to this project will be documented in this file.
 ## [2025-08-28]
 ### Fixed
 - Avoid persisting Streamlit widget keys so buttons like "Add Income Card" no longer crash on startup.
+
+## [2025-08-29]
+### Fixed
+- Updated CI workflow to run `ruff check .` to fix "unrecognized subcommand '.'" errors.
