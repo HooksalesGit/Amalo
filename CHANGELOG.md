@@ -31,6 +31,11 @@ All notable changes to this project will be documented in this file.
 
 ## [2025-08-26]
 
+### Changed
+- Split combined math/pandas import lines in calculators into separate statements.
+- Removed unused variable in `default_gross_up_pct` to satisfy lint.
+
+
 ### Removed
 - Unused `Optional` import from `amalo.models`.
 
@@ -43,5 +48,6 @@ All notable changes to this project will be documented in this file.
 - Removed unused variable in `default_gross_up_pct` to resolve linter warning.
 ### Changed
 - Reformatted codebase using `black`.
+
 
 
