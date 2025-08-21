@@ -27,6 +27,8 @@ from core.calculators import (
     monthly_payment,
     principal_from_payment,
     nz,
+    default_gross_up_pct,
+    filter_support_income,
 )
 from core.rules import evaluate_rules, has_blocking
 from export.pdf_export import build_prequal_pdf
@@ -376,18 +378,35 @@ def render_rental_form():
         horizontal=True,
         index=0 if st.session_state.rental_method == "ScheduleE" else 1,
     )
+    if st.session_state.rental_method == "ScheduleE":
+        st.info("Using Schedule E net income")
+    else:
+        st.info("Using 75% of gross rents")
     st.session_state.subject_market_rent = st.number_input(
         "Subject Market Rent (if applicable)",
         value=float(st.session_state.subject_market_rent),
         step=50.0,
     )
-    render_income_tab("rental_rows", RENTAL_FIELDS, "Rental Property", model_cls=Rental, show_header=False)
+    st.session_state.subject_pitia = st.number_input(
+        "Subject PITIA (if applicable)",
+        value=float(st.session_state.subject_pitia),
+        step=50.0,
+    )
+    render_income_tab(
+        "rental_rows", RENTAL_FIELDS, "Rental Property", model_cls=Rental, show_header=False
+    )
 
 
 def render_other_income_form():
     render_income_tab("other_rows", OTHER_FIELDS, "Other Income", model_cls=OtherIncome, show_header=False)
+    rows = st.session_state.get("other_rows", [])
+    for row in rows:
+        default = default_gross_up_pct(row.get("Type", ""), st.session_state.program)
+        if nz(row.get("GrossUpPct")) == 0 and default:
+            row["GrossUpPct"] = default
+    st.session_state.other_rows = rows
     st.session_state.support_continuance_ok = st.checkbox(
-        "Support income (if any) has ≥3 years continuance",
+        "Alimony/child support/housing allowance has ≥3 years continuance",
         value=bool(st.session_state.support_continuance_ok),
     )
 
@@ -626,12 +645,15 @@ def init_state():
     ss.setdefault("first_use_va", True)
     ss.setdefault("rental_method", "ScheduleE")
     ss.setdefault("subject_market_rent", 0.0)
+    ss.setdefault("subject_pitia", 0.0)
     ss.setdefault("k1_verified_distributions", False)
     ss.setdefault("k1_analyzed_liquidity", False)
     ss.setdefault("k1_justification", "")
     ss.setdefault("selfemp_year_mode", "average")
     ss.setdefault("support_continuance_ok", False)
-    ss.setdefault("borrower_names", {1: "Borrower 1", 2: "Borrower 2"})
+    ss.setdefault(
+        "borrower_names", {i: f"Borrower {i}" for i in range(1, 5)}
+    )
     ss.setdefault("employer_suggestions", [])
     ss.setdefault("business_suggestions", [])
     # dynamic row storage for calculators
@@ -687,15 +709,27 @@ def compute_results():
         st.session_state.first_use_va,
         st.session_state.fico_bucket,
     )
+    subj_pitia = st.session_state.subject_pitia or fees["total"]
+    st.session_state.subject_pitia = subj_pitia
     rentals_df = rentals_policy(
         rental_df,
         method=st.session_state.rental_method,
-        subject_pitia=fees["total"],
+        subject_pitia=subj_pitia,
         subject_market_rent=st.session_state.subject_market_rent,
     )
     recent_selfemp = st.session_state.selfemp_year_mode != "average"
     k1_allowed = st.session_state.k1_verified_distributions or st.session_state.k1_analyzed_liquidity
     k1_input = k1_df if (not k1_df.empty and k1_allowed) else None
+    uses_support_income = (
+        any(
+            other_df["Type"].astype(str).str.lower().str.contains(
+                "alimony|child|housing", regex=True
+            )
+        )
+        if not other_df.empty
+        else False
+    )
+    other_df = filter_support_income(other_df, st.session_state.support_continuance_ok)
     incomes = combine_income(
         st.session_state.num_borrowers,
         w2_df,
@@ -727,7 +761,6 @@ def compute_results():
     if uses_c1120:
         own = pd.to_numeric(c1120_df['OwnershipPct'], errors='coerce').fillna(0)
         c1120_any_lt_100 = any(own < 100)
-    uses_support_income = any(other_df['Type'].astype(str).str.lower().str.contains('alimony|child', regex=True)) if not other_df.empty else False
     rental_method_conflict = False
     sanity_inputs_out_of_band = False
     if st.session_state.housing['purchase_price'] > 0:
@@ -963,7 +996,7 @@ def render_borrower_setup():
     )
     with st.expander("Borrowers"):
         st.session_state.num_borrowers = st.number_input(
-            "Number of Borrowers", min_value=1, max_value=6, value=int(st.session_state.num_borrowers), step=1
+            "Number of Borrowers", min_value=1, max_value=4, value=int(st.session_state.num_borrowers), step=1
         )
         for i in range(1, st.session_state.num_borrowers + 1):
             st.session_state.borrower_names[i] = st.text_input(
@@ -1008,6 +1041,12 @@ def render_dashboard():
     BE = data["BE"]
     rule_results = data["rule_results"]
     st.dataframe(incomes, use_container_width=True)
+    if not incomes.empty:
+        bcols = st.columns(len(incomes))
+        for idx, row in enumerate(incomes.itertuples()):
+            bcols[idx].metric(
+                f"Borrower {row.BorrowerID} Income", f"${row.TotalMonthlyIncome:,.2f}"
+            )
     cols = st.columns(4)
     cols[0].metric("Total Monthly Income", f"${total_income:,.2f}")
     cols[1].metric("Housing (PITIA)", f"${fees['total']:,.2f}")
