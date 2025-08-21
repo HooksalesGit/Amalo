@@ -159,7 +159,14 @@ def render_property_column():
         fico_to_bucket(h.get("credit_score")),
     )
     st.session_state["housing_calc"] = comps
-    st.caption(f"Base Loan: ${base_loan:,.0f} • LTV: {comps['ltv']*100:.2f}%")
+    program = st.session_state.get("program_name", "Conventional")
+    if h.get("finance_upfront", True) and program in ("FHA", "VA", "USDA"):
+        st.caption(
+            f"Base Loan: ${base_loan:,.0f} • Adjusted Loan: ${comps['adjusted_loan']:,.0f}"
+        )
+    else:
+        st.caption(f"Base Loan: ${base_loan:,.0f}")
+    st.caption(f"LTV: {comps['ltv']*100:.2f}%")
     st.caption(f"PITIA: ${comps['total']:,.2f}")
     return comps
 
@@ -235,7 +242,7 @@ def main():
             "be_target": targets["be_target"],
         }
         render_bottombar(summary, st.session_state["ui_prefs"].get("show_bottom_bar", False))
-    else:
+    elif view_mode == "dashboard":
         housing = st.session_state.get("housing_calc", {"total": 0})
         income_total = sum(
             card.get("payload", {}).get("QualMonthly", card.get("payload", {}).get("GrossMonthly", 0))
@@ -245,6 +252,7 @@ def main():
         debt_total = sum(
             card.get("payload", {}).get("monthly_payment", 0) or 0
             for card in st.session_state.get("debt_cards", [])
+            if not card.get("payload", {}).get("payoff_at_close", False)
         )
         fe, be = dti(housing.get("total", 0), housing.get("total", 0) + debt_total, income_total)
         summary = {
@@ -256,6 +264,10 @@ def main():
             "be_target": st.session_state["program_targets"]["be_target"],
         }
         render_dashboard_view(summary)
+    else:
+        from ui.max_qualifiers import render_max_qualifiers_view
+
+        render_max_qualifiers_view()
 
     st.sidebar.checkbox(
         "Show Bottom Bar",

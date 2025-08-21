@@ -2,10 +2,20 @@ import copy
 import streamlit as st
 
 DEBT_MODELS = {
-    "installment": {"name": "", "monthly_payment": 0.0, "remaining_payments": 0},
-    "revolving": {"name": "", "monthly_payment": 0.0},
-    "student_loan": {"name": "", "monthly_payment": 0.0, "balance": 0.0},
-    "support": {"name": "", "monthly_payment": 0.0},
+    "installment": {
+        "name": "",
+        "monthly_payment": 0.0,
+        "remaining_payments": 0,
+        "payoff_at_close": False,
+    },
+    "revolving": {"name": "", "monthly_payment": 0.0, "payoff_at_close": False},
+    "student_loan": {
+        "name": "",
+        "monthly_payment": 0.0,
+        "balance": 0.0,
+        "payoff_at_close": False,
+    },
+    "support": {"name": "", "monthly_payment": 0.0, "payoff_at_close": False},
 }
 
 
@@ -39,7 +49,9 @@ def render_debt_cards() -> float:
                         label = f.replace("_", " ").title()
                         st.markdown(f"**{label}**")
                         st.caption(f"Enter {label}")
-                        if isinstance(v, (int, float)):
+                        if isinstance(v, bool):
+                            payload[f] = st.checkbox("", value=v, key=f"debt_{idx}_{f}")
+                        elif isinstance(v, (int, float)):
                             payload[f] = st.number_input("", value=float(v), key=f"debt_{idx}_{f}")
                         else:
                             payload[f] = st.text_input("", value=v, key=f"debt_{idx}_{f}")
@@ -52,6 +64,7 @@ def render_debt_cards() -> float:
             if c2.button("Duplicate", key=f"debt_dup_{idx}"):
                 st.session_state.debt_cards.append(copy.deepcopy(card))
                 st.experimental_rerun()
-        total += float(card["payload"].get("monthly_payment", 0))
+        if not card["payload"].get("payoff_at_close", False):
+            total += float(card["payload"].get("monthly_payment", 0))
     st.markdown(f"**Total Monthly Debts:** ${total:,.2f}")
     return total

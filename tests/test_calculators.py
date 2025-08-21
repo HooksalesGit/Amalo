@@ -8,6 +8,7 @@ from core.calculators import (
     monthly_payment,
     principal_from_payment,
     max_affordable_pi,
+    max_qualifying_loan,
     rentals_policy,
     default_gross_up_pct,
     filter_support_income,
@@ -32,6 +33,48 @@ def test_max_affordable_pi():
     fe, be, cons = max_affordable_pi(12000, 500, 800, 31, 45)
     assert cons <= fe and cons <= be
     assert cons >= 0
+
+
+def test_max_qualifying_loan_fha_financed():
+    res = max_qualifying_loan(
+        10000,
+        500,
+        300,
+        31,
+        45,
+        6.5,
+        30,
+        20000,
+        "FHA",
+        CONV_MI_BANDS,
+        FHA_TABLES,
+        VA_TABLE,
+        USDA_TABLE,
+        True,
+        True,
+        ">=740",
+    )
+    assert res["adjusted_loan"] >= res["base_loan"]
+    assert abs(res["purchase_price"] - (res["base_loan"] + 20000)) < 1e-6
+
+
+def test_apply_program_fees_financed_ltv():
+    res = apply_program_fees(
+        "FHA",
+        300000,
+        285000,
+        15000,
+        6.5,
+        30,
+        CONV_MI_BANDS,
+        FHA_TABLES,
+        VA_TABLE,
+        USDA_TABLE,
+        True,
+        True,
+        ">=740",
+    )
+    assert abs(res["ltv"] - (res["adjusted_loan"] / 300000 * 100)) < 1e-6
 
 
 def test_rentals_policy_schedule_e():

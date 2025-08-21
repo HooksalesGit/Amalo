@@ -26,5 +26,7 @@ def render_bottombar(summary: dict, enabled: bool):
         if cols[4].button("Open Dashboard"):
             st.session_state["view_mode"] = "dashboard"
             st.experimental_rerun()
-        cols[5].button("Open Max Qualifiers")
+        if cols[5].button("Open Max Qualifiers"):
+            st.session_state["view_mode"] = "max_qualifiers"
+            st.experimental_rerun()
         st.markdown("</div>", unsafe_allow_html=True)
