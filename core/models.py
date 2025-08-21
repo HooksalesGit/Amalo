@@ -17,6 +17,7 @@ class W2(BaseModel):
     Comm_LY: float = 0.0
     Months_LY: float = 0.0
     VarAvgMonths: int = 12
+    Base_LY: float = 0.0
     IncludeVariable: bool = False
 
 

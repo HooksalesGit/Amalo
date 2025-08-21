@@ -12,6 +12,7 @@ from core.calculators import (
     apply_program_fees,
     sch_c_totals,
     w2_totals,
+    k1_totals,
 )
 from core.presets import CONV_MI_BANDS, FHA_TABLES, VA_TABLE, USDA_TABLE
 
@@ -125,4 +126,52 @@ def test_w2_totals_clips_negatives_and_warns():
     res = w2_totals(df)
     assert float(res.loc[0, "VariableMonthly"]) == 0.0
     assert bool(res.loc[0, "W2_InsufficientVarFlag"])
+
+
+def test_w2_base_decline_flag():
+    df = pd.DataFrame(
+        [
+            {"BorrowerID": 1, "PayType": "Salary", "AnnualSalary": 40000, "Base_LY": 60000, "IncludeVariable": 0},
+            {"BorrowerID": 2, "PayType": "Salary", "AnnualSalary": 50000, "Base_LY": 50000, "IncludeVariable": 0},
+        ]
+    )
+    res = w2_totals(df)
+    b1 = bool(res.loc[res["BorrowerID"] == 1, "W2_DecliningBaseFlag"].iloc[0])
+    b2 = bool(res.loc[res["BorrowerID"] == 2, "W2_DecliningBaseFlag"].iloc[0])
+    assert b1 and not b2
+
+
+def test_sch_c_recent_only_toggle():
+    df = pd.DataFrame(
+        [
+            {"BorrowerID": 1, "Year": 2023, "NetProfit": 100000},
+            {"BorrowerID": 1, "Year": 2024, "NetProfit": 50000},
+        ]
+    )
+    avg = sch_c_totals(df)
+    recent = sch_c_totals(df, recent_only=True)
+    assert round(float(avg.loc[0, "SchC_Monthly"]), 2) == round((100000 + 50000) / 2 / 12, 2)
+    assert round(float(recent.loc[0, "SchC_Monthly"]), 2) == round(50000 / 12, 2)
+
+
+def test_k1_declining_flag():
+    df = pd.DataFrame(
+        [
+            {"BorrowerID": 1, "Year": 2023, "OwnershipPct": 50, "Ordinary": 80000},
+            {"BorrowerID": 1, "Year": 2024, "OwnershipPct": 50, "Ordinary": 40000},
+        ]
+    )
+    res = k1_totals(df)
+    assert bool(res.loc[0, "K1_DecliningFlag"])
+
+
+def test_rental_declining_flag():
+    df = pd.DataFrame(
+        [
+            {"BorrowerID": 1, "Property": "A", "Year": 2023, "Rents": 24000, "Expenses": 12000, "Depreciation": 3000},
+            {"BorrowerID": 1, "Property": "A", "Year": 2024, "Rents": 18000, "Expenses": 12000, "Depreciation": 3000},
+        ]
+    )
+    res = rentals_policy(df, method="ScheduleE")
+    assert bool(res.loc[0, "Rental_DecliningFlag"])
 

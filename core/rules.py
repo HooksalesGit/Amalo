@@ -32,6 +32,14 @@ def evaluate_rules(state: dict) -> List[RuleResult]:
                 message="Potentially declining W‑2 variable income.",
             )
         )
+    if w2_meta.get("declining_base", False):
+        res.append(
+            RuleResult(
+                code="W2_BASE_DECLINE",
+                severity="warn",
+                message="Potentially declining W‑2 base income.",
+            )
+        )
 
     if state.get("schc_declining", False):
         res.append(
@@ -39,6 +47,33 @@ def evaluate_rules(state: dict) -> List[RuleResult]:
                 code="SCHC_DECLINE",
                 severity="warn",
                 message="Schedule C year‑over‑year decline >20%.",
+            )
+        )
+
+    if state.get("k1_declining", False):
+        res.append(
+            RuleResult(
+                code="K1_DECLINE",
+                severity="warn",
+                message="K‑1 income declining year‑over‑year.",
+            )
+        )
+
+    if state.get("c1120_declining", False):
+        res.append(
+            RuleResult(
+                code="C1120_DECLINE",
+                severity="warn",
+                message="1120 income declining year‑over‑year.",
+            )
+        )
+
+    if state.get("rental_declining", False):
+        res.append(
+            RuleResult(
+                code="RENTAL_DECLINE",
+                severity="warn",
+                message="Rental income declining year‑over‑year.",
             )
         )
 
