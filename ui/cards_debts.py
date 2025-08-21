@@ -26,7 +26,9 @@ def _default_payload(t: str) -> dict:
 def render_debt_cards() -> float:
     st.session_state.setdefault("debt_cards", [])
     if st.button("Add Debt Card", key="add_debt_card"):
-        st.session_state.debt_cards.append({"type": "installment", "payload": _default_payload("installment")})
+        st.session_state.debt_cards.append(
+            {"type": "installment", "payload": _default_payload("installment")}
+        )
     total = 0.0
     for idx, card in enumerate(list(st.session_state.debt_cards)):
         label = card["type"].replace("_", " ").title()
@@ -52,9 +54,13 @@ def render_debt_cards() -> float:
                         if isinstance(v, bool):
                             payload[f] = st.checkbox("", value=v, key=f"debt_{idx}_{f}")
                         elif isinstance(v, (int, float)):
-                            payload[f] = st.number_input("", value=float(v), key=f"debt_{idx}_{f}")
+                            payload[f] = st.number_input(
+                                "", value=float(v), key=f"debt_{idx}_{f}"
+                            )
                         else:
-                            payload[f] = st.text_input("", value=v, key=f"debt_{idx}_{f}")
+                            payload[f] = st.text_input(
+                                "", value=v, key=f"debt_{idx}_{f}"
+                            )
             preview = float(payload.get("monthly_payment", 0))
             st.caption(f"Monthly Payment: ${preview:,.2f}")
             c1, c2 = st.columns(2)

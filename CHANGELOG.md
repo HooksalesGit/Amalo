@@ -30,5 +30,18 @@ All notable changes to this project will be documented in this file.
 - Basic Spanish translations loaded from a JSON file with UI toggle support.
 
 ## [2025-08-26]
+
 ### Removed
 - Unused `Optional` import from `amalo.models`.
+
+
+### Fixed
+- Split semicolon-separated assignments in rules modules into separate lines to satisfy style checks.
+
+
+### Fixed
+- Removed unused variable in `default_gross_up_pct` to resolve linter warning.
+### Changed
+- Reformatted codebase using `black`.
+
+

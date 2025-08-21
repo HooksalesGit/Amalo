@@ -5,6 +5,7 @@ from core.calculators import monthly_payment
 def housing_app():
     import streamlit as st
     import app
+
     app.render_property_column()
 
 
