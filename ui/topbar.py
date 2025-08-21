@@ -31,7 +31,7 @@ def render_topbar():
                 st.session_state["be_target"] = be
             tgt = {"fe_target": fe, "be_target": be}
         with right:
-            view_mode = st.radio("View", ["data_entry", "dashboard"], horizontal=True, key="view_mode")
+            view_mode = st.radio("View", ["data_entry", "dashboard", "max_qualifiers"], horizontal=True, key="view_mode")
             st.session_state.setdefault("ui_prefs", {})
             st.session_state["ui_prefs"].setdefault("language", "en")
             st.session_state["ui_prefs"]["language"] = st.selectbox("Lang", ["en", "es"], key="ui_lang", index=["en","es"].index(st.session_state["ui_prefs"].get("language","en")))

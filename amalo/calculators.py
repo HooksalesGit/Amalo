@@ -510,20 +510,23 @@ def apply_program_fees(
         ann_pct = fha_mip_factor(ltv, term_years, fha_tables.get("annual_table", {}))
         upfront = base_loan * (uf_pct / 100)
         adj = base_loan + upfront if finance_upfront else base_loan
+        ltv_calc = compute_ltv(purchase_price, adj) if finance_upfront else ltv
         mi_monthly = adj * (ann_pct / 100) / 12
-        return {"adjusted_loan": adj, "mi_monthly": mi_monthly, "upfront_amt": upfront, "ltv": ltv}
+        return {"adjusted_loan": adj, "mi_monthly": mi_monthly, "upfront_amt": upfront, "ltv": ltv_calc}
     if program == "VA":
         fee_pct = va_funding_fee_pct(first_use_va, down_pct, va_tbl)
         upfront = base_loan * (fee_pct / 100)
         adj = base_loan + upfront if finance_upfront else base_loan
-        return {"adjusted_loan": adj, "mi_monthly": 0.0, "upfront_amt": upfront, "ltv": ltv}
+        ltv_calc = compute_ltv(purchase_price, adj) if finance_upfront else ltv
+        return {"adjusted_loan": adj, "mi_monthly": 0.0, "upfront_amt": upfront, "ltv": ltv_calc}
     if program == "USDA":
         g_pct = usda_guarantee_pct(usda_tbl)
         upfront = base_loan * (g_pct / 100)
         adj = base_loan + upfront if finance_upfront else base_loan
         ann_pct = usda_annual_fee_pct(usda_tbl)
         mi_monthly = adj * (ann_pct / 100) / 12
-        return {"adjusted_loan": adj, "mi_monthly": mi_monthly, "upfront_amt": upfront, "ltv": ltv}
+        ltv_calc = compute_ltv(purchase_price, adj) if finance_upfront else ltv
+        return {"adjusted_loan": adj, "mi_monthly": mi_monthly, "upfront_amt": upfront, "ltv": ltv_calc}
     return {"adjusted_loan": base_loan, "mi_monthly": 0.0, "upfront_amt": 0.0, "ltv": ltv}
 
 
@@ -601,3 +604,83 @@ def max_affordable_pi(
     fe_max = max(0.0, inc * nz(target_fe_pct) / 100 - nz(taxes_ins_hoa_mi))
     be_max = max(0.0, inc * nz(target_be_pct) / 100 - nz(other_liabilities))
     return fe_max, be_max, min(fe_max, be_max)
+
+
+def max_qualifying_loan(
+    total_income,
+    other_liabilities,
+    taxes_ins_hoa_mi,
+    target_fe_pct,
+    target_be_pct,
+    rate_pct,
+    term_years,
+    down_payment_amt,
+    program,
+    conv_mi_tbl,
+    fha_tables,
+    va_tbl,
+    usda_tbl,
+    finance_upfront,
+    first_use_va,
+    fico_bucket,
+    iterations: int = 20,
+):
+    """Solve for maximum loan amount given DTI targets and cash to close."""
+
+    fe_max, be_max, pi_allowed = max_affordable_pi(
+        total_income, other_liabilities, taxes_ins_hoa_mi, target_fe_pct, target_be_pct
+    )
+    if pi_allowed <= 0:
+        return {
+            "max_pi": 0.0,
+            "base_loan": 0.0,
+            "adjusted_loan": 0.0,
+            "purchase_price": down_payment_amt,
+        }
+
+    adj_limit = principal_from_payment(pi_allowed, rate_pct, term_years)
+    low, high = 0.0, adj_limit
+    for _ in range(iterations):
+        mid = (low + high) / 2
+        fees = apply_program_fees(
+            program,
+            mid + down_payment_amt,
+            mid,
+            down_payment_amt,
+            rate_pct,
+            term_years,
+            conv_mi_tbl,
+            fha_tables,
+            va_tbl,
+            usda_tbl,
+            finance_upfront,
+            first_use_va,
+            fico_bucket,
+        )
+        if fees["adjusted_loan"] > adj_limit:
+            high = mid
+        else:
+            low = mid
+    base = low
+    purchase_price = base + down_payment_amt
+    fees = apply_program_fees(
+        program,
+        purchase_price,
+        base,
+        down_payment_amt,
+        rate_pct,
+        term_years,
+        conv_mi_tbl,
+        fha_tables,
+        va_tbl,
+        usda_tbl,
+        finance_upfront,
+        first_use_va,
+        fico_bucket,
+    )
+    return {
+        "max_pi": pi_allowed,
+        "base_loan": base,
+        "adjusted_loan": fees["adjusted_loan"],
+        "purchase_price": purchase_price,
+    }
