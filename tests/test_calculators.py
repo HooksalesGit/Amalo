@@ -9,6 +9,8 @@ from core.calculators import (
     principal_from_payment,
     max_affordable_pi,
     rentals_policy,
+    default_gross_up_pct,
+    filter_support_income,
     apply_program_fees,
     sch_c_totals,
     w2_totals,
@@ -174,4 +176,37 @@ def test_rental_declining_flag():
     )
     res = rentals_policy(df, method="ScheduleE")
     assert bool(res.loc[0, "Rental_DecliningFlag"])
+
+
+def test_rentals_policy_75pct_subject_pitia():
+    df = pd.DataFrame(
+        [{"BorrowerID": 1, "Property": "A", "Year": 2024, "Rents": 12000, "Expenses": 0, "Depreciation": 0}]
+    )
+    agg = rentals_policy(
+        df,
+        method="SeventyFivePctGross",
+        subject_pitia=1000,
+        subject_market_rent=2000,
+    )
+    expected = 0.75 * (12000 / 12) + 0.75 * 2000 - 1000
+    assert round(float(agg.loc[0, "Rental_Monthly"]), 2) == round(expected, 2)
+
+
+def test_default_gross_up_pct():
+    assert default_gross_up_pct("Social Security", "FHA") == 25.0
+    assert default_gross_up_pct("Disability", "Conventional") == 15.0
+    assert default_gross_up_pct("Unknown", "VA") == 0.0
+
+
+def test_filter_support_income():
+    df = pd.DataFrame(
+        [
+            {"BorrowerID": 1, "Type": "Alimony", "GrossMonthly": 1000, "GrossUpPct": 0},
+            {"BorrowerID": 1, "Type": "Housing Allowance", "GrossMonthly": 500, "GrossUpPct": 0},
+            {"BorrowerID": 1, "Type": "Bonus", "GrossMonthly": 300, "GrossUpPct": 0},
+        ]
+    )
+    flt = filter_support_income(df, False)
+    assert all(~flt["Type"].str.lower().str.contains("alimony|housing"))
+    assert len(flt) == 1
 

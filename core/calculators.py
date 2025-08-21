@@ -331,6 +331,32 @@ def rentals_policy(
         agg["Rental_DecliningFlag"] = False
         return agg[["BorrowerID", "Rental_Monthly", "Rental_DecliningFlag"]]
 
+
+def default_gross_up_pct(income_type: str, program: str) -> float:
+    """Return recommended gross-up percentage for common non-taxable income.
+
+    The defaults reflect typical FHA/VA/Conventional guidelines.  Only a few
+    income types are recognized; all others return ``0`` meaning no gross-up is
+    suggested.
+    """
+
+    itype = (income_type or "").lower()
+    prog = (program or "").lower()
+    if "social" in itype:
+        return 25.0
+    if "disability" in itype:
+        return 15.0
+    return 0.0
+
+
+def filter_support_income(df: pd.DataFrame, continuance_ok: bool) -> pd.DataFrame:
+    """Exclude support or housing allowance income when continuance not met."""
+
+    if continuance_ok or df is None or df.empty:
+        return df
+    mask = ~df["Type"].astype(str).str.lower().str.contains("alimony|child|housing", regex=True)
+    return df[mask]
+
 def other_income_totals(df: pd.DataFrame) -> pd.DataFrame:
     """Aggregate miscellaneous income sources such as alimony or SSA.
 
