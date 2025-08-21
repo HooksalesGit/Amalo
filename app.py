@@ -53,25 +53,21 @@ def pretty_label(label: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", " ", label).strip()
 
 
-def _restore_scroll():
-    """Restore scroll position stored in session storage."""
+def _persist_scroll():
+    """Store and restore scroll position without forcing reruns."""
 
     html(
         """
         <script>
         const pos = sessionStorage.getItem('scrollPos');
         if (pos) window.scrollTo(0, parseInt(pos));
+        window.addEventListener('scroll', () => {
+            sessionStorage.setItem('scrollPos', window.scrollY);
+        });
         </script>
         """,
         height=0,
     )
-
-
-def _save_scroll_and_rerun():
-    """Persist scroll position then rerun the app."""
-
-    html("<script>sessionStorage.setItem('scrollPos', window.scrollY);</script>", height=0)
-    st.experimental_rerun()
 
 
 # ---------------------------------------------------------------------------
@@ -136,6 +132,11 @@ FIELD_GUIDANCE = {
     "TaxRatePct": "Annual property tax rate % of price.",
     "HOI_Annual": "Annual homeowners insurance premium.",
     "HOA_Monthly": "Monthly HOA/condo dues.",
+}
+
+FIELD_DOC_LINKS = {
+    "AnnualSalary": "https://www.irs.gov/pub/irs-pdf/fw2.pdf",
+    "NetProfit": "https://www.irs.gov/pub/irs-pdf/f1040sc.pdf",
 }
 
 # ---------------------------------------------------------------------------
@@ -252,7 +253,6 @@ def render_w2_form():
     if st.button("Add W-2 Job", key="add_w2_job"):
         rows.append(W2().model_dump())
         st.session_state["w2_rows"] = rows
-        st.experimental_rerun()
     for idx, row in enumerate(rows):
         title = row.get("Employer") or f"Job {idx + 1}"
         with st.expander(title, expanded=True):
@@ -264,7 +264,12 @@ def render_w2_form():
                     target = cols[f_idx % 3]
                     with target:
                         if ftype == "text":
-                            val = text_input_with_help(fname, fkey, fname, value=row.get(fname, ""))
+                            sugg = st.session_state.get("employer_suggestions", []) if fname == "Employer" else None
+                            val = text_input_with_help(
+                                fname, fkey, fname, value=row.get(fname, ""), suggestions=sugg
+                            )
+                            if fname == "Employer" and val and val not in st.session_state.employer_suggestions:
+                                st.session_state.employer_suggestions.append(val)
                         elif ftype == "number":
                             val = number_input_with_help(
                                 fname, fkey, fname, value=float(row.get(fname, 0) or 0), step=1.0
@@ -301,11 +306,9 @@ def render_w2_form():
             if save:
                 rows[idx] = row
                 st.session_state["w2_rows"] = rows
-                st.experimental_rerun()
             if remove:
                 rows.pop(idx)
                 st.session_state["w2_rows"] = rows
-                st.experimental_rerun()
 
 
 def render_schedule_c_form():
@@ -366,7 +369,7 @@ def render_debt_form():
 # calculators for end users.
 # ---------------------------------------------------------------------------
 
-def text_input_with_help(label: str, key: str, help_key: str, value=""):
+def text_input_with_help(label: str, key: str, help_key: str, value="", suggestions=None):
     """Text input with guidance rendered between the title and control."""
 
     disp = pretty_label(label)
@@ -374,7 +377,18 @@ def text_input_with_help(label: str, key: str, help_key: str, value=""):
     help = FIELD_GUIDANCE.get(help_key, "")
     if help:
         st.caption(help)
-    return st.text_input("", value=value, key=key, label_visibility="collapsed")
+    link = FIELD_DOC_LINKS.get(help_key)
+    if link:
+        st.markdown(f"<a href='{link}' target='_blank'>📄</a>", unsafe_allow_html=True)
+    val = st.text_input("", value=value, key=key, label_visibility="collapsed")
+    if suggestions:
+        pick = st.selectbox(
+            "", [""] + suggestions, key=f"{key}_suggest", label_visibility="collapsed"
+        )
+        if pick:
+            val = pick
+            st.session_state[key] = val
+    return val
 
 
 def number_input_with_help(
@@ -391,6 +405,9 @@ def number_input_with_help(
     help = FIELD_GUIDANCE.get(help_key, "")
     if help:
         st.caption(help)
+    link = FIELD_DOC_LINKS.get(help_key)
+    if link:
+        st.markdown(f"<a href='{link}' target='_blank'>📄</a>", unsafe_allow_html=True)
     return st.number_input(
         "",
         value=value,
@@ -410,6 +427,9 @@ def selectbox_with_help(label: str, options: list, key: str, help_key: str, inde
     help = FIELD_GUIDANCE.get(help_key, "")
     if help:
         st.caption(help)
+    link = FIELD_DOC_LINKS.get(help_key)
+    if link:
+        st.markdown(f"<a href='{link}' target='_blank'>📄</a>", unsafe_allow_html=True)
     return st.selectbox(
         "",
         options=options,
@@ -427,6 +447,9 @@ def checkbox_with_help(label: str, key: str, help_key: str):
     help = FIELD_GUIDANCE.get(help_key, "")
     if help:
         st.caption(help)
+    link = FIELD_DOC_LINKS.get(help_key)
+    if link:
+        st.markdown(f"<a href='{link}' target='_blank'>📄</a>", unsafe_allow_html=True)
     return st.checkbox("", key=key, label_visibility="collapsed")
 
 
@@ -443,6 +466,9 @@ def borrower_select_with_help(label: str, key: str, help_key: str, value: int = 
     help = FIELD_GUIDANCE.get(help_key, "")
     if help:
         st.caption(help)
+    link = FIELD_DOC_LINKS.get(help_key)
+    if link:
+        st.markdown(f"<a href='{link}' target='_blank'>📄</a>", unsafe_allow_html=True)
     return st.selectbox(
         "",
         options=ids,
@@ -481,14 +507,24 @@ def render_income_tab(key_name, fields, title, model_cls=None, show_header: bool
             if st.button("Remove", key=f"{key_name}_remove_{idx}"):
                 rows.pop(idx)
                 st.session_state[key_name] = rows
-                _save_scroll_and_rerun()
             cols = st.columns(2)
             for f_idx, (fname, ftype, options) in enumerate(fields):
                 fkey = f"{key_name}_{idx}_{fname}"
                 target = cols[f_idx % 2]
                 with target:
                     if ftype == "text":
-                        val = text_input_with_help(fname, fkey, fname, value=row.get(fname, ""))
+                        sugg = None
+                        if fname == "Employer":
+                            sugg = st.session_state.get("employer_suggestions", [])
+                        elif fname == "BusinessName":
+                            sugg = st.session_state.get("business_suggestions", [])
+                        val = text_input_with_help(
+                            fname, fkey, fname, value=row.get(fname, ""), suggestions=sugg
+                        )
+                        if fname == "Employer" and val and val not in st.session_state.employer_suggestions:
+                            st.session_state.employer_suggestions.append(val)
+                        if fname == "BusinessName" and val and val not in st.session_state.business_suggestions:
+                            st.session_state.business_suggestions.append(val)
                     elif ftype == "number":
                         val = number_input_with_help(
                             fname, fkey, fname, value=float(row.get(fname, 0) or 0), step=1.0
@@ -529,10 +565,9 @@ def render_income_tab(key_name, fields, title, model_cls=None, show_header: bool
                     blank[fname] = 1
         rows.append(blank)
         st.session_state[key_name] = rows
-        _save_scroll_and_rerun()
 
 st.set_page_config(page_title="AMALO MORTGAGE INCOME & DTI DASHBOARD", layout="wide")
-_restore_scroll()
+_persist_scroll()
 
 def init_state():
     ss = st.session_state
@@ -557,6 +592,8 @@ def init_state():
     ss.setdefault("k1_analyzed_liquidity", False)
     ss.setdefault("support_continuance_ok", False)
     ss.setdefault("borrower_names", {1: "Borrower 1", 2: "Borrower 2"})
+    ss.setdefault("employer_suggestions", [])
+    ss.setdefault("business_suggestions", [])
     # dynamic row storage for calculators
     ss.setdefault("w2_rows", [])
     ss.setdefault("schc_rows", [])
@@ -753,11 +790,29 @@ def render_property_section():
             ]
         )
         with mi_tab:
-            df = pd.DataFrame(
-                [{"Band": k, "AnnualPct": v} for k, v in st.session_state.program_tables["conventional_mi"].items()]
-            )
-            df = st.data_editor(df, use_container_width=True)
-            st.session_state.program_tables["conventional_mi"] = dict(zip(df["Band"], df["AnnualPct"]))
+            mi = st.session_state.program_tables["conventional_mi"]
+            remove = []
+            for i, (band, pct) in enumerate(list(mi.items())):
+                with st.container():
+                    st.markdown(f"**Band {i + 1}**")
+                    c1, c2, c3 = st.columns([2, 1, 1])
+                    new_band = c1.text_input("LTV Band", value=band, key=f"mi_band_{i}")
+                    new_pct = c2.number_input(
+                        "Annual %", value=float(pct), step=0.01, key=f"mi_pct_{i}"
+                    )
+                    if c3.button("Remove", key=f"mi_rm_{i}"):
+                        remove.append(band)
+                    else:
+                        if new_band != band:
+                            mi.pop(band)
+                            mi[new_band] = new_pct
+                        else:
+                            mi[band] = new_pct
+                st.divider()
+            for band in remove:
+                mi.pop(band, None)
+            if st.button("Add LTV Band", key="mi_add"):
+                mi[f"Band{len(mi) + 1}"] = 0.0
         with fha_tab:
             cols = st.columns(2)
             st.session_state.program_tables["fha"]["ufmip_pct"] = cols[0].number_input(
@@ -766,15 +821,52 @@ def render_property_section():
                 step=0.05,
             )
             tbl = st.session_state.program_tables["fha"].get("annual_table", {})
-            df = pd.DataFrame([{"Key": k, "AnnualPct": v} for k, v in tbl.items()])
-            df = st.data_editor(df, use_container_width=True)
-            st.session_state.program_tables["fha"]["annual_table"] = {r["Key"]: r["AnnualPct"] for _, r in df.iterrows()}
+            remove = []
+            for i, (k, v) in enumerate(list(tbl.items())):
+                with st.container():
+                    st.markdown(f"**Tier {i + 1}**")
+                    c1, c2, c3 = st.columns([2, 1, 1])
+                    new_k = c1.text_input("Key", value=k, key=f"fha_key_{i}")
+                    new_v = c2.number_input(
+                        "Annual %", value=float(v), step=0.01, key=f"fha_pct_{i}"
+                    )
+                    if c3.button("Remove", key=f"fha_rm_{i}"):
+                        remove.append(k)
+                    else:
+                        if new_k != k:
+                            tbl.pop(k)
+                            tbl[new_k] = new_v
+                        else:
+                            tbl[k] = new_v
+                st.divider()
+            for k in remove:
+                tbl.pop(k, None)
+            if st.button("Add Tier", key="fha_add"):
+                tbl[f"key{len(tbl) + 1}"] = 0.0
+            st.session_state.program_tables["fha"]["annual_table"] = tbl
         with va_tab:
             st.session_state.first_use_va = st.checkbox("First Use", value=bool(st.session_state.first_use_va))
             va = st.session_state.program_tables["va"]
-            df = pd.DataFrame([{"Key": k, "Pct": v} for k, v in va.items()])
-            df = st.data_editor(df, use_container_width=True)
-            st.session_state.program_tables["va"] = {r["Key"]: r["Pct"] for _, r in df.iterrows()}
+            remove = []
+            for i, (k, v) in enumerate(list(va.items())):
+                with st.container():
+                    st.markdown(f"**Row {i + 1}**")
+                    c1, c2, c3 = st.columns([2, 1, 1])
+                    new_k = c1.text_input("Key", value=k, key=f"va_key_{i}")
+                    new_v = c2.number_input("Pct", value=float(v), step=0.01, key=f"va_pct_{i}")
+                    if c3.button("Remove", key=f"va_rm_{i}"):
+                        remove.append(k)
+                    else:
+                        if new_k != k:
+                            va.pop(k)
+                            va[new_k] = new_v
+                        else:
+                            va[k] = new_v
+                st.divider()
+            for k in remove:
+                va.pop(k, None)
+            if st.button("Add Row", key="va_add"):
+                va[f"key{len(va) + 1}"] = 0.0
         with usda_tab:
             usda = st.session_state.program_tables["usda"]
             c = st.columns(2)
@@ -1075,9 +1167,37 @@ else:
         unsafe_allow_html=True,
     )
 
+st.markdown(
+    """
+    <style>
+    @media (max-width: 600px) {
+        div[class^='stColumn'] {flex: 1 1 100% !important;}
+    }
+    input, select {width: 100% !important;}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+steps = ["Borrower Setup", "Income", "Housing/Debts", "Dashboard", "Exports"]
+completed = {
+    "Borrower Setup": True,
+    "Income": bool(
+        st.session_state.w2_rows
+        or st.session_state.schc_rows
+        or st.session_state.k1_rows
+        or st.session_state.c1120_rows
+        or st.session_state.rental_rows
+        or st.session_state.other_rows
+    ),
+    "Housing/Debts": bool(st.session_state.debt_rows) or bool(st.session_state.housing),
+    "Dashboard": False,
+    "Exports": False,
+}
 nav = st.sidebar.radio(
     "Navigate",
-    ["Borrower Setup", "Income", "Housing/Debts", "Dashboard", "Exports"],
+    steps,
+    format_func=lambda x: ("✅ " if completed.get(x) else "") + x,
 )
 
 st.title("AMALO MORTGAGE INCOME & DTI DASHBOARD")
