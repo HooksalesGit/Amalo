@@ -28,3 +28,12 @@ All notable changes to this project will be documented in this file.
 - Expanded disclaimer clarifies calculations are estimates and stresses AUS results, lender overlays, and income stability.
 - Simple audit log utility records user changes with timestamps.
 - Basic Spanish translations loaded from a JSON file with UI toggle support.
+
+## [2025-08-26]
+### Added
+- App displays version in top bar and autosaves session data.
+- Refactored monolithic `app.py` into modular UI components with Pydantic models.
+- Placeholders added for future credit report, property valuation and bank statement integrations.
+- CI now runs ruff, black and pytest.
+### Changed
+- `dti` clips negative incomes to zero and additional test coverage was added.

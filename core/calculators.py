@@ -621,7 +621,7 @@ def piti_components(
 def dti(front_housing, all_liabilities, total_income):
     """Return front‑end and back‑end debt‑to‑income ratios."""
 
-    inc = nz(total_income)
+    inc = max(0.0, nz(total_income))
     fe = 0.0 if inc == 0 else nz(front_housing) / inc
     be = 0.0 if inc == 0 else nz(all_liabilities) / inc
     return fe, be
