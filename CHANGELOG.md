@@ -71,3 +71,8 @@ All notable changes to this project will be documented in this file.
 ## [2025-08-29]
 ### Fixed
 - Updated CI workflow to run `ruff check .` to fix "unrecognized subcommand '.'" errors.
+
+## [2025-08-30]
+### Added
+- What-if calculator provides quick toggles for down payment, rate, and monthly debt changes.
+- Reserve requirement and DSCR helpers support investment property analyses.

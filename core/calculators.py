@@ -3,6 +3,31 @@ import math
 import pandas as pd
 
 
+# ---------------------------------------------------------------------------
+# Helper constants for additional calculators
+# ---------------------------------------------------------------------------
+
+# Default reserve requirements expressed in months of PITIA by loan program and
+# property type. Values are intentionally conservative but easily adjustable by
+# callers if guidelines change.
+RESERVE_REQUIREMENTS = {
+    "Conventional": {"primary": 2, "investment": 6},
+    "FHA": {"primary": 1, "investment": 3},
+    "VA": {"primary": 2, "investment": 6},
+    "USDA": {"primary": 1, "investment": 3},
+}
+
+# Typical minimum DSCR ratios by program.  Most agency products require the
+# property to break even (ratio >= 1.0) while some portfolio products may have
+# higher thresholds.
+DSCR_MINIMUMS = {
+    "Conventional": 1.0,
+    "FHA": 1.0,
+    "VA": 1.0,
+    "USDA": 1.0,
+}
+
+
 def nz(x, default=0.0):
     """Return a float for ``x`` or a fallback value.
 
@@ -875,4 +900,104 @@ def max_qualifying_loan(
         "base_loan": base,
         "adjusted_loan": fees["adjusted_loan"],
         "purchase_price": purchase_price,
+    }
+
+
+# ---------------------------------------------------------------------------
+# What‑if, reserves and DSCR helpers
+# ---------------------------------------------------------------------------
+
+
+def reserve_requirement(pitia: float, property_type: str, program: str) -> float:
+    """Return required reserves in dollars for the given scenario.
+
+    ``pitia`` is the monthly payment (principal, interest, taxes, insurance and
+    association dues). ``property_type`` should be ``"primary"`` or
+    ``"investment"``. ``program`` is the loan program such as "Conventional" or
+    "FHA". The function multiplies ``pitia`` by the guideline number of months
+    for the combination; unknown inputs yield ``0``.
+    """
+
+    prop = (property_type or "").lower()
+    months = RESERVE_REQUIREMENTS.get(program, {}).get(prop, 0)
+    return months * nz(pitia)
+
+
+def dscr(monthly_rent: float, pitia: float, program: str = "Conventional") -> dict:
+    """Calculate Debt Service Coverage Ratio and flag if below minimum.
+
+    Returns a dictionary with the computed ratio under ``dscr`` and a boolean
+    ``below_minimum`` indicating whether the ratio falls short of the typical
+    program threshold.
+    """
+
+    ratio = 0.0 if nz(pitia) == 0 else nz(monthly_rent) / nz(pitia)
+    min_ratio = DSCR_MINIMUMS.get(program, 1.0)
+    return {"dscr": ratio, "below_minimum": ratio < min_ratio, "minimum": min_ratio}
+
+
+def what_if_max_qualifying(
+    total_income,
+    other_debts,
+    taxes_ins_hoa_mi,
+    fe_target,
+    be_target,
+    rate_pct,
+    term_years,
+    down_payment_amt,
+    program,
+    conv_mi_tbl,
+    fha_tables,
+    va_tbl,
+    usda_tbl,
+    finance_upfront,
+    first_use_va,
+    fico_bucket,
+):
+    """Evaluate max loan and DTI under several quick adjustment scenarios.
+
+    The baseline scenario uses the provided inputs.  Additional scenarios apply
+    common what‑if adjustments to highlight their impact:
+
+    - ``down_payment_plus_10k`` adds $10,000 to the down payment.
+    - ``rate_plus_0.25`` increases the interest rate by 0.25 percentage points.
+    - ``debt_plus_300`` adds $300 to the other monthly debt load.
+    """
+
+    def scenario(dp, rate, debts):
+        res = max_qualifying_loan(
+            total_income,
+            debts,
+            taxes_ins_hoa_mi,
+            fe_target,
+            be_target,
+            rate,
+            term_years,
+            dp,
+            program,
+            conv_mi_tbl,
+            fha_tables,
+            va_tbl,
+            usda_tbl,
+            finance_upfront,
+            first_use_va,
+            fico_bucket,
+        )
+        fe, be = dti(
+            res["max_pi"] + taxes_ins_hoa_mi,
+            res["max_pi"] + taxes_ins_hoa_mi + debts,
+            total_income,
+        )
+        return {"fe_dti": fe, "be_dti": be, "max_loan": res["adjusted_loan"]}
+
+    base = scenario(down_payment_amt, rate_pct, other_debts)
+    dp_up = scenario(down_payment_amt + 10_000, rate_pct, other_debts)
+    rate_up = scenario(down_payment_amt, rate_pct + 0.25, other_debts)
+    debt_up = scenario(down_payment_amt, rate_pct, other_debts + 300)
+
+    return {
+        "base": base,
+        "down_payment_plus_10k": dp_up,
+        "rate_plus_0.25": rate_up,
+        "debt_plus_300": debt_up,
     }
