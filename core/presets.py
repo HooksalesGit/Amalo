@@ -1,8 +1,10 @@
 
-DISCLAIMER = ("This tool implements common calculations aligned with agency/investor practices "
-"(e.g., FNMA-style self-employed analyses, K‑1 distribution/liquidity checks, and program-aware MI/MIP/funding fees). "
-"It does not replace AUS findings, investor guides, or underwriter discretion. Use conservative income and document "
-"continuance, trends, and business liquidity as applicable.")
+DISCLAIMER = (
+    "This tool implements common calculations aligned with agency/investor practices "
+    "(e.g., FNMA-style self-employed analyses, K‑1 distribution/liquidity checks, and program-aware MI/MIP/funding fees). "
+    "Results are estimates only; AUS findings, lender overlays, and underwriter discretion prevail. "
+    "Income used must be stable and well documented—demonstrate continuance, trends, and business liquidity as applicable."
+)
 
 PROGRAM_PRESETS = {"Conventional":{"FE":31.0,"BE":45.0},"FHA":{"FE":31.0,"BE":50.0},
 "VA":{"FE":35.0,"BE":50.0},"USDA":{"FE":29.0,"BE":41.0},"Jumbo":{"FE":35.0,"BE":43.0}}

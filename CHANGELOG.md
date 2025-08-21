@@ -21,3 +21,10 @@ All notable changes to this project will be documented in this file.
 ## [2025-08-24]
 ### Added
 - Document checklist builder with checkboxes and PDF export support.
+
+## [2025-08-25]
+### Added
+- Critical warnings now require an override reason before PDF export and the reason is captured for audit.
+- Expanded disclaimer clarifies calculations are estimates and stresses AUS results, lender overlays, and income stability.
+- Simple audit log utility records user changes with timestamps.
+- Basic Spanish translations loaded from a JSON file with UI toggle support.
